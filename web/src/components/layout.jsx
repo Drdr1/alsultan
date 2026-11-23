@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive } from 'lucide-react';
+import { Storefront } from '@phosphor-icons/react';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive } from './icons.jsx';
 import { TERM_DAYS, money } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, cn } from './ui.jsx';
 
 export function Logo({ className }) {
   return <span className={cn('inline-flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground', className)} aria-hidden="true">
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V8l8-4 8 4v11" /><path d="M9 19v-6h6v6" /><path d="M3 19h18" /></svg>
+    <Storefront weight="fill" className="size-5" />
   </span>;
 }
 
@@ -73,7 +74,7 @@ export function Layout({ children }) {
       <nav className="grid gap-0.5 px-3">
         <div className="px-3 pb-2 pt-3 text-xs font-medium text-muted-foreground">{me.role === 'admin' ? 'الإدارة' : 'المندوب'}</div>
         {items.map(([k, I, l, n, tone]) => <button key={k} onClick={() => nav(k)} className={cn('flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors', active === k ? 'bg-card font-medium text-foreground shadow-card ring-1 ring-border' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
-          <I className="size-4" /><span className="flex-1 text-start">{l}</span>{n > 0 && <Badge variant={tone === 'danger' ? 'solid' : tone}>{n}</Badge>}
+          <I className="size-5" /><span className="flex-1 text-start">{l}</span>{n > 0 && <Badge variant={tone === 'danger' ? 'solid' : tone}>{n}</Badge>}
         </button>)}
       </nav>
       <div className="mt-auto grid gap-3 p-3">

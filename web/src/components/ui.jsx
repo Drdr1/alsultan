@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle2, AlertCircle, Radio } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Radio } from './icons.jsx';
 
 export const cn = (...a) => a.filter(Boolean).join(' ');
 
@@ -17,7 +17,7 @@ const BTN = {
 };
 const SIZE = { default: 'h-9 px-4 text-sm', sm: 'h-8 px-3 text-[13px]', lg: 'h-11 px-5 text-[15px]', icon: 'h-9 w-9' };
 export function Button({ variant = 'default', size = 'default', className, ...p }) {
-  return <button className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0', BTN[variant], SIZE[size], className)} {...p} />;
+  return <button className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-[18px] [&_svg]:shrink-0', BTN[variant], SIZE[size], className)} {...p} />;
 }
 
 /* ---------- Card ---------- */

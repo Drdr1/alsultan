@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, Store, Wallet, ChevronLeft, AlertTriangle } from 'lucide-react';
+import { Search, Store, Wallet, ChevronLeft, AlertTriangle } from './icons.jsx';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { money, TERM_DAYS, TYPE, DAY, startOfDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
@@ -24,7 +24,7 @@ export function StatCard({ icon: Icon, label, value, sub, tone = 'default' }) {
   return <Card className={cn('p-4 md:p-5', tone === 'danger' && 'border-danger/30')}>
     <div className="flex items-center justify-between gap-3">
       <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
-      <span className={cn('inline-flex size-8 items-center justify-center rounded-md', t)}><Icon className="size-4" /></span>
+      <span className={cn('inline-flex size-10 items-center justify-center rounded-lg', t)}><Icon className="size-[22px]" /></span>
     </div>
     <div className={cn('tnum mt-3 text-xl font-bold tracking-tight md:text-2xl', tone === 'danger' && 'text-danger')}>{value}</div>
     {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}

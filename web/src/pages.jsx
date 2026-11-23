@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search } from 'lucide-react';
+import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search } from './components/icons.jsx';
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs } from './components/dialogs.jsx';

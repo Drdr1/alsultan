@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock } from './icons.jsx';
 import { money, parseAmount, fmtDate, TERM_DAYS, DAY } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Dialog, Button, Input, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
