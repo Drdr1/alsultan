@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* zinc neutrals, near-black primary, one blue brand accent; green = collected, red = overdue/over limit */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 4%;
+  --card: 0 0% 100%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --border: 240 6% 90%;
+  --ring: 221 83% 53%;
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 98%;
+  --brand: 221 83% 53%;
+  --brand-soft: 221 90% 96%;
+  --success: 158 64% 32%;
+  --success-soft: 152 60% 95%;
+  --danger: 0 72% 48%;
+  --danger-soft: 0 86% 97%;
+  --warning: 32 94% 40%;
+  --warning-soft: 43 96% 94%;
+  --sidebar: 240 5% 97.5%;
+  --chart-1: #2E9D6E;
+  --chart-2: #2F6FD0;
+  --chart-grid: #ECECEF;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: 240 10% 4%; --foreground: 0 0% 98%; --card: 240 8% 6%; --muted: 240 4% 14%; --muted-foreground: 240 5% 65%;
+    --border: 240 4% 17%; --primary: 0 0% 98%; --primary-foreground: 240 6% 10%; --brand: 217 91% 64%; --brand-soft: 222 47% 14%;
+    --success: 152 55% 50%; --success-soft: 155 40% 11%; --danger: 0 84% 66%; --danger-soft: 0 45% 12%; --warning: 38 92% 58%; --warning-soft: 35 50% 11%;
+    --sidebar: 240 8% 5%; --chart-1: #2FA472; --chart-2: #5B8FE6; --chart-grid: #26262B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --background: 240 10% 4%; --foreground: 0 0% 98%; --card: 240 8% 6%; --muted: 240 4% 14%; --muted-foreground: 240 5% 65%;
+  --border: 240 4% 17%; --primary: 0 0% 98%; --primary-foreground: 240 6% 10%; --brand: 217 91% 64%; --brand-soft: 222 47% 14%;
+  --success: 152 55% 50%; --success-soft: 155 40% 11%; --danger: 0 84% 66%; --danger-soft: 0 45% 12%; --warning: 38 92% 58%; --warning-soft: 35 50% 11%;
+  --sidebar: 240 8% 5%; --chart-1: #2FA472; --chart-2: #5B8FE6; --chart-grid: #26262B; color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-background text-foreground font-sans antialiased; font-size: 14px; direction: rtl; }
+* { @apply border-border; }
+.tnum { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 11px; }
+.recharts-cartesian-grid line { stroke: var(--chart-grid); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

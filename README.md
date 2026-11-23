@@ -45,6 +45,18 @@
    ```
 7. المناديب يعملوا حساباتهم، والإدارة تفعلهم وتحدد حد الائتمان من الصفحة الرئيسية.
 
+## الواجهة (React)
+
+الواجهة الحالية في فولدر `web/` (React + Tailwind + Recharts). الملفات اللي في الجذر (`index.html`, `app.js`, `styles.css`) نسخة قديمة بدون build.
+
+```bash
+cd web
+npm install
+npm run dev      # تشغيل محلي
+npm run build    # الناتج في web/dist ويترفع على أي استضافة
+```
+حط بيانات Supabase في `web/public/config.js`.
+
 ## الملفات
 
 | الملف | الوظيفة |
