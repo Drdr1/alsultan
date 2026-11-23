@@ -350,9 +350,83 @@ function handleChange(evt) {
 /* ---------------- navigation ---------------- */
 function go(view) { state.stack.push(state.view); state.view = view; state.search = ''; state.monthFilter = 'all'; render(); window.scrollTo({ top: 0 }); }
 function back() { state.view = state.stack.pop() || { name: 'home' }; render(); }
+function nav(name) { state.view = { name }; state.stack = []; state.search = ''; render(); window.scrollTo({ top: 0 }); }
+
+/* ---------------- icons (stroke, 24 grid) ---------------- */
+const ICONS = {
+  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>',
+  userplus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  logout: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M8 17l-5-5 5-5"/><path d="M3 12h12"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  wallet: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
+  file: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  store: '<path d="M3 9h18l-1.5-5h-15z"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>',
+  down: '<path d="M22 17 13.5 8.5l-5 5L2 7"/><path d="M16 17h6v-6"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-8"/>',
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+const initials = (name) => String(name || '؟').replace(/^(سوبر ماركت|ماركت|كشك|بقالة|صيدلية|مخازن|هايبر)\s+/, '').replace(/^(د\.|الحاج|عم|أم|أبو)\s+/, '').replace(/^ال(?=\S{2})/, '').trim().charAt(0);
 
 /* ---------------- rendering ---------------- */
 const root = () => $('#app');
+
+function navItems() {
+  if (state.me.role === 'admin') {
+    const pendTx = state.txs.filter((t) => t.status === 'pending').length;
+    const pendAcc = reps().filter((r) => !r.active).length;
+    return [
+      ['home', 'home', 'لوحة التحكم', 0],
+      ['reps', 'users', 'المناديب', 0],
+      ['overdue', 'alert', 'العملاء المتأخرين', visibleOverdue().length],
+      ['approvals', 'check', 'طلبات التصحيح', pendTx],
+      ['accounts', 'userplus', 'الحسابات الجديدة', pendAcc],
+    ];
+  }
+  return [
+    ['home', 'home', 'الرئيسية', 0],
+    ['overdue', 'alert', 'المتأخرين', visibleOverdue().length],
+  ];
+}
+
+function activeNav() {
+  const v = state.view.name;
+  if (v === 'rep') return 'reps';
+  if (v === 'customer') return state.stack[0]?.name || 'home';
+  return v;
+}
+
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'الحسابات الجديدة' };
+
+function crumbs() {
+  const v = state.view;
+  const parts = [];
+  const rootName = activeNav();
+  const rootTitle = state.me.role === 'rep' && rootName === 'home' ? 'الرئيسية' : (TITLES[rootName] || 'الرئيسية');
+  parts.push(rootTitle);
+  if (v.name === 'rep') parts.push(profileName(v.id));
+  if (v.name === 'customer') {
+    const c = state.customers.find((x) => x.id === v.id);
+    if (c && state.me.role === 'admin' && state.stack.some((s) => s.name === 'rep')) parts.push(profileName(c.rep_id));
+    parts.push(c?.name || '');
+  }
+  return parts;
+}
 
 function render() {
   closePanels();
@@ -361,39 +435,59 @@ function render() {
   const v = state.view;
   let body = '';
   if (v.name === 'customer') body = viewCustomer(v.id);
-  else if (state.me.role === 'admin') body = v.name === 'rep' ? viewRepDetail(v.id) : viewAdminHome();
-  else body = viewRepHome();
-  root().innerHTML = header() + `<main class="wrap">${body}</main>` + footer();
+  else if (state.me.role === 'admin') {
+    body = ({ rep: () => viewRepDetail(v.id), reps: viewReps, overdue: viewOverdue, approvals: viewApprovals, accounts: viewAccounts }[v.name] || viewAdminHome)();
+  } else body = v.name === 'overdue' ? viewOverdue() : viewRepHome();
+  const items = navItems();
+  const act = activeNav();
+  const cr = crumbs();
+  root().innerHTML = `
+  <div class="shell">
+    <aside class="side">
+      <button class="side-brand" data-act="nav" data-k="home">
+        <span class="logo" aria-hidden="true">${ic('store')}</span>
+        <span><b>السلطان</b><small>للتوزيع · السويس</small></span>
+      </button>
+      <nav class="side-nav">
+        <span class="side-label">${state.me.role === 'admin' ? 'الإدارة' : 'المندوب'}</span>
+        ${items.map(([k, i, l, n]) => `<button class="nav-i ${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em class="${k === 'overdue' ? 'bad' : ''}">${n}</em>` : ''}</button>`).join('')}
+      </nav>
+      <div class="side-foot">
+        <div class="live" id="live"><i></i><span>متصل · تحديث لحظي</span></div>
+        <div class="me">
+          <span class="avatar">${esc(state.me.full_name.charAt(0))}</span>
+          <span class="me-t"><b>${esc(state.me.full_name)}</b><small>${state.me.role === 'admin' ? 'مدير' : 'مندوب مبيعات'}</small></span>
+          <button class="icon-btn" data-act="logout" title="تسجيل الخروج" aria-label="تسجيل الخروج">${ic('logout')}</button>
+        </div>
+      </div>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-title">
+          ${state.stack.length ? `<button class="icon-btn back" data-act="back" aria-label="رجوع">${ic('right')}</button>` : ''}
+          <div>
+            ${cr.length > 1 ? '' : '<!--'}<div class="crumbs">${cr.map((p, i) => `<span class="${i === cr.length - 1 ? 'cur-c' : ''}">${esc(p)}</span>`).join(ic('left', 'sep'))}</div>${cr.length > 1 ? '' : '-->'}
+            <h1>${esc(cr[cr.length - 1])}</h1>
+          </div>
+        </div>
+        <div class="tb-tools">
+          <span class="today">${dFmt.format(new Date())}</span>
+          <button class="icon-btn bell ${visibleOverdue().length ? 'has' : ''}" data-act="bell" aria-label="التنبيهات">${ic('bell')}${visibleOverdue().length ? `<em>${visibleOverdue().length}</em>` : ''}</button>
+          <button class="icon-btn m-only" data-act="logout" aria-label="تسجيل الخروج">${ic('logout')}</button>
+        </div>
+        <div class="panel" id="bell-panel" hidden></div>
+      </header>
+      <main class="content">${body}${footer()}</main>
+    </div>
+    <nav class="bottom-nav">${items.slice(0, 4).map(([k, i, l, n]) => `<button class="${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em>${n}</em>` : ''}</button>`).join('')}</nav>
+  </div>`;
   renderLiveDot();
   const s = $('#search'); if (s && state._refocus) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); state._refocus = false; }
 }
 
-function header() {
-  const overdue = visibleOverdue();
-  return `
-  <header class="top"><div class="wrap top-in">
-    <button class="brand" data-act="home" aria-label="الرئيسية">
-      <span class="mark" aria-hidden="true">س</span>
-      <span><b>السلطان</b><small>للتوزيع - السويس</small></span>
-    </button>
-    <div class="top-tools">
-      <span class="live" id="live"><i></i><span>مباشر</span></span>
-      <button class="bell ${overdue.length ? 'has' : ''}" data-act="bell" aria-label="التنبيهات">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"/></svg>
-        ${overdue.length ? `<em>${overdue.length}</em>` : ''}
-      </button>
-      <div class="who"><b>${esc(state.me.full_name)}</b><small>${state.me.role === 'admin' ? 'إدارة' : 'مندوب'}</small></div>
-      <button class="ghost sm" data-act="logout">خروج</button>
-    </div>
-  </div>
-  <div class="panel" id="bell-panel" hidden></div>
-  </header>`;
-}
-
 function footer() {
-  return `<footer class="wrap foot">
-    ${api.mode === 'demo' ? `<span>نسخة تجريبية: البيانات محفوظة على الجهاز ده فقط. افتح تابين (مندوب وإدارة) وشوف التحديث اللحظي.</span><button class="link" data-act="reset-demo">رجّع البيانات التجريبية</button>` : `<span>كل الحركات محفوظة في الأرشيف ولا تُحذف.</span>`}
-    <span class="muted">الأجل ${TERM_DAYS} يوم · من اليوم ${TERM_DAYS + 1} العميل يتعلم بالأحمر</span>
+  return `<footer class="foot">
+    ${api.mode === 'demo' ? `<span>${ic('zap')} نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button class="link" data-act="reset-demo">استرجاع البيانات التجريبية</button>` : `<span>${ic('archive')} كل الحركات محفوظة في الأرشيف ولا تُحذف.</span>`}
   </footer>`;
 }
 
@@ -401,7 +495,7 @@ function renderLiveDot() {
   const el = $('#live'); if (!el) return;
   const ok = state.liveStatus === 'SUBSCRIBED';
   el.classList.toggle('off', !ok);
-  el.lastElementChild.textContent = ok ? 'مباشر' : 'بيعيد الاتصال…';
+  el.lastElementChild.textContent = ok ? 'متصل · تحديث لحظي' : 'جاري إعادة الاتصال…';
 }
 
 function visibleOverdue() {
@@ -409,20 +503,32 @@ function visibleOverdue() {
     .sort((a, b) => state.stats.get(b.id).overdueDays - state.stats.get(a.id).overdueDays);
 }
 
+const levelOf = (sum) => (sum.over ? 'bad' : sum.pct >= 0.85 ? 'warn' : 'ok');
+
 function meter(sum) {
-  const pct = Math.min(sum.pct, 1.15);
-  const cls = sum.over ? 'bad' : sum.pct >= 0.85 ? 'warn' : 'ok';
-  return `<div class="meter ${cls}" role="img" aria-label="المديونية ${Math.round(sum.pct * 100)}% من حد الائتمان">
-    <div class="bar"><span style="width:${Math.min(pct, 1) * 100}%"></span></div>
-    <div class="meter-l"><span>${Math.round(sum.pct * 100)}% من الحد</span><span>${sum.over ? 'فوق الحد بـ ' + money(sum.total - sum.limit) : 'متاح ' + money(sum.limit - sum.total)}</span></div>
+  return `<div class="meter ${levelOf(sum)}" role="img" aria-label="المديونية ${Math.round(sum.pct * 100)}% من حد الائتمان">
+    <div class="bar"><span style="width:${Math.min(sum.pct, 1) * 100}%"></span></div>
+    <div class="meter-l"><span>${Math.round(sum.pct * 100)}% من الحد</span><span>${sum.over ? 'تجاوز بـ ' + money(sum.total - sum.limit) : 'متاح ' + money(sum.limit - sum.total)}</span></div>
   </div>`;
 }
 
+function gauge(sum) {
+  const r = 52, C = 2 * Math.PI * r, p = Math.min(sum.pct, 1);
+  return `<div class="gauge ${levelOf(sum)}">
+    <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${r}" class="g-track"/><circle cx="60" cy="60" r="${r}" class="g-val" stroke-dasharray="${C * p} ${C}" transform="rotate(-90 60 60)"/></svg>
+    <div class="g-t"><b>${Math.round(sum.pct * 100)}%</b><small>من الحد</small></div>
+  </div>`;
+}
+
+function kpi(icon, label, value, sub = '', tone = '') {
+  return `<div class="kpi ${tone}"><span class="kpi-ic">${ic(icon)}</span><div><span class="kpi-l">${label}</span><b class="kpi-v">${value}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+}
+
 function statusChip(s) {
-  if (s.balance <= 0.009) return '<span class="chip ok">خالص</span>';
-  if (s.overdue) return `<span class="chip bad">متأخر ${s.overdueDays} يوم</span>`;
+  if (s.balance <= 0.009) return '<span class="pill ok"><i></i>مسدد</span>';
+  if (s.overdue) return `<span class="pill bad"><i></i>متأخر ${s.overdueDays} يوم</span>`;
   const left = TERM_DAYS - s.age + 1;
-  return `<span class="chip ${left <= 3 ? 'warn' : 'neutral'}">باقي ${left} يوم</span>`;
+  return `<span class="pill ${left <= 3 ? 'warn' : 'neutral'}"><i></i>باقي ${left} يوم</span>`;
 }
 
 function customerTable(list, { showRep = false, actions = true } = {}) {
@@ -434,19 +540,19 @@ function customerTable(list, { showRep = false, actions = true } = {}) {
     return (B.overdue - A.overdue) || (B.balance - A.balance);
   });
   const canCollect = actions && state.me.role === 'rep';
-  if (!rows.length) return `<div class="empty">${list.length ? 'مفيش نتائج للبحث ده.' : 'لسه مفيش عملاء. دوس "إضافة عميل" وسجل أول عميل بالرصيد اللي عليه.'}</div>`;
+  if (!rows.length) return `<div class="empty">${ic('store')}<p>${list.length ? 'لا توجد نتائج مطابقة للبحث.' : 'لا يوجد عملاء بعد. اضغط "إضافة عميل" لتسجيل أول عميل ورصيده.'}</p></div>`;
   return `<div class="table-scroll"><table class="grid cust-list">
-    <thead><tr><th>العميل</th>${showRep ? '<th>المندوب</th>' : ''}<th>النوع</th><th class="num">عليه</th><th class="num">تحصيل الشهر</th><th>الأجل</th>${canCollect ? '<th></th>' : ''}</tr></thead>
+    <thead><tr><th>العميل</th>${showRep ? '<th>المندوب</th>' : ''}<th>النوع</th><th class="num">الرصيد المستحق</th><th class="num">تحصيل الشهر</th><th>حالة الأجل</th><th></th></tr></thead>
     <tbody>${rows.map((c) => {
       const s = state.stats.get(c.id);
       return `<tr class="${s.overdue ? 'row-bad' : ''}" data-act="open-customer" data-id="${c.id}" tabindex="0">
-        <td class="c-name"><b class="cname">${esc(c.name)}</b><small class="sub">${esc(c.location || '')}${c.phone ? ' · <span dir="ltr">' + esc(c.phone) + '</span>' : ''}</small></td>
+        <td class="c-name"><div class="who-cell"><span class="av ${s.overdue ? 'bad' : ''}">${esc(initials(c.name))}</span><div><b class="cname">${esc(c.name)}</b><small class="sub">${esc(c.location || '')}${c.phone ? ' · <span dir="ltr">' + esc(c.phone) + '</span>' : ''}</small></div></div></td>
         ${showRep ? `<td class="c-rep">${esc(profileName(c.rep_id))}</td>` : ''}
-        <td class="c-type"><span class="chip type">${TYPE[c.debt_type] || ''}</span></td>
+        <td class="c-type"><span class="tag">${TYPE[c.debt_type] || ''}</span></td>
         <td class="num strong c-bal">${money(s.balance)}</td>
-        <td class="num c-month" data-l="حصّل الشهر: ">${s.monthCollected ? money(s.monthCollected) : '<span class="muted">—</span>'}</td>
-        <td class="c-stat">${statusChip(s)}${s.pending ? ' <span class="chip pend">طلب تصحيح</span>' : ''}</td>
-        ${canCollect ? `<td class="act"><button class="primary sm" data-act="collect" data-id="${c.id}" ${s.balance <= 0 ? 'disabled' : ''}>تحصيل</button></td>` : ''}
+        <td class="num c-month" data-l="تحصيل الشهر: ">${s.monthCollected ? money(s.monthCollected) : '<span class="muted">—</span>'}</td>
+        <td class="c-stat">${statusChip(s)}${s.pending ? ' <span class="pill pend"><i></i>تصحيح معلق</span>' : ''}</td>
+        <td class="act">${canCollect ? `<button class="btn primary sm" data-act="collect" data-id="${c.id}" ${s.balance <= 0 ? 'disabled' : ''}>${ic('wallet')}تحصيل</button>` : `<span class="row-go">${ic('left')}</span>`}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -454,7 +560,7 @@ function customerTable(list, { showRep = false, actions = true } = {}) {
 
 function listTools(extra = '') {
   return `<div class="tools">
-    <input id="search" type="search" placeholder="ابحث باسم العميل أو التليفون أو المنطقة" value="${esc(state.search)}" autocomplete="off">
+    <div class="search">${ic('search')}<input id="search" type="search" placeholder="بحث بالاسم أو التليفون أو المنطقة" value="${esc(state.search)}" autocomplete="off"></div>
     <div class="seg" role="group" aria-label="نوع المديونية">
       ${['all', 'retail', 'wholesale'].map((k) => `<button class="${state.typeFilter === k ? 'on' : ''}" data-act="type" data-k="${k}">${k === 'all' ? 'الكل' : TYPE[k]}</button>`).join('')}
     </div>
@@ -462,31 +568,43 @@ function listTools(extra = '') {
   </div>`;
 }
 
+function creditCard(sum, title, extra = '') {
+  return `<section class="card credit ${sum.over ? 'is-bad' : ''}">
+    ${gauge(sum)}
+    <div class="credit-body">
+      <span class="kpi-l">${title}</span>
+      <div class="big">${money(sum.total)} <span class="cur">ج.م</span></div>
+      <div class="credit-row">
+        <div><span>حد الائتمان</span><b>${money(sum.limit)}</b></div>
+        <div><span>${sum.over ? 'التجاوز' : 'المتاح'}</span><b class="${sum.over ? 't-bad' : 't-ok'}">${money(Math.abs(sum.limit - sum.total))}</b></div>
+        <div><span>قطاعي</span><b>${money(sum.retail)}</b></div>
+        <div><span>جملة</span><b>${money(sum.wholesale)}</b></div>
+      </div>
+      ${extra}
+    </div>
+  </section>`;
+}
+
 /* ----- rep home ----- */
 function viewRepHome() {
   const sum = repSummary(state.me, state.customers, state.stats);
   const overdue = sum.customers.filter((c) => state.stats.get(c.id).overdue).length;
   return `
-  ${sum.over ? `<div class="stop" role="alert"><b>موقوف عن البيع الآجل</b><span>مديونيتك ${money(sum.total)} فوق حد الائتمان ${money(sum.limit)} بـ ${money(sum.total - sum.limit)} ج.م. حصّل من العملاء عشان ترجع تشتغل.</span></div>` : ''}
-  <section class="hero ${sum.over ? 'is-bad' : ''}">
-    <div class="hero-main">
-      <span class="eyebrow">إجمالي المديونية اللي في السوق</span>
-      <div class="big">${egp(sum.total)}</div>
-      <div class="hero-sub">حد الائتمان: <b>${money(sum.limit)}</b> ج.م</div>
-      ${meter(sum)}
+  ${sum.over ? `<div class="banner bad" role="alert">${ic('lock')}<div><b>تم إيقاف البيع الآجل</b><span>مديونيتك ${money(sum.total)} ج.م تجاوزت حد الائتمان (${money(sum.limit)}) بمبلغ ${money(sum.total - sum.limit)} ج.م. قم بالتحصيل من العملاء لاستئناف العمل.</span></div></div>` : ''}
+  <div class="grid-2">
+    ${creditCard(sum, 'إجمالي المديونية في السوق')}
+    <div class="kpis">
+      ${kpi('down', 'تحصيل الشهر', money(sum.month), monthLabel(monthKey(Date.now())), 'ok')}
+      ${kpi('store', 'عدد العملاء', sum.customers.length, 'عميل نشط')}
+      ${kpi('alert', 'عملاء متأخرين', overdue, `تجاوزوا ${TERM_DAYS} يوم`, overdue ? 'bad' : '')}
+      ${kpi('clock', 'مدة الأجل', TERM_DAYS + ' يوم', 'من تاريخ الفاتورة')}
     </div>
-    <dl class="kpis">
-      <div><dt>تحصيل الشهر ده</dt><dd>${money(sum.month)}</dd></div>
-      <div><dt>عملاء</dt><dd>${sum.customers.length}</dd></div>
-      <div class="${overdue ? 'bad' : ''}"><dt>متأخرين (+${TERM_DAYS} يوم)</dt><dd>${overdue}</dd></div>
-      <div><dt>قطاعي / جملة</dt><dd class="small">${money(sum.retail)} / ${money(sum.wholesale)}</dd></div>
-    </dl>
-  </section>
+  </div>
   <section class="card">
-    <div class="sec-head"><h2>عملائي</h2>
+    <div class="card-h"><div><h2>عملائي</h2><small class="sub">مرتبين حسب التأخير ثم الرصيد</small></div>
       <div class="btns">
-        <button class="secondary" data-act="invoice-pick" ${sum.over ? 'disabled title="موقوف: فوق حد الائتمان"' : ''}>فاتورة آجل</button>
-        <button class="primary" data-act="add-customer">+ إضافة عميل</button>
+        <button class="btn secondary" data-act="invoice-pick" ${sum.over ? 'disabled title="موقوف: تجاوز حد الائتمان"' : ''}>${ic('file')}فاتورة آجل</button>
+        <button class="btn primary" data-act="add-customer">${ic('plus')}إضافة عميل</button>
       </div>
     </div>
     ${listTools()}
@@ -494,59 +612,97 @@ function viewRepHome() {
   </section>`;
 }
 
-/* ----- admin home ----- */
+/* ----- admin ----- */
+function adminSums() {
+  return reps().filter((r) => r.active).map((r) => ({ r, s: repSummary(r, state.customers, state.stats) }));
+}
+
+function repCards(sums) {
+  return `<div class="reps">${sums.sort((a, b) => b.s.pct - a.s.pct).map(({ r, s }) => `
+    <button class="rep ${s.over ? 'is-bad' : ''}" data-act="open-rep" data-id="${r.id}">
+      <div class="rep-h"><span class="avatar">${esc(r.full_name.charAt(0))}</span><div><b>${esc(r.full_name)}</b><small class="sub" dir="ltr">@${esc(r.username)}</small></div>${s.over ? '<span class="pill bad"><i></i>موقوف</span>' : `<span class="pill ${levelOf(s) === 'warn' ? 'warn' : 'ok'}"><i></i>${levelOf(s) === 'warn' ? 'قريب من الحد' : 'نشط'}</span>`}</div>
+      <div class="rep-n">${money(s.total)} <span class="cur">ج.م</span></div>
+      ${meter(s)}
+      <div class="rep-f"><span>${ic('store')}${s.customers.length} عميل</span><span>${ic('down')}${money(s.month)}</span>${s.overdue ? `<span class="t-bad">${ic('alert')}${s.overdue} متأخر</span>` : ''}</div>
+    </button>`).join('') || `<div class="empty">${ic('users')}<p>لا يوجد مناديب مفعّلين بعد.</p></div>`}
+  </div>`;
+}
+
 function viewAdminHome() {
-  const all = reps();
-  const sums = all.filter((r) => r.active).map((r) => ({ r, s: repSummary(r, state.customers, state.stats) }));
+  const sums = adminSums();
   const total = sums.reduce((a, x) => a + x.s.total, 0);
   const month = sums.reduce((a, x) => a + x.s.month, 0);
   const stopped = sums.filter((x) => x.s.over).length;
   const overdue = visibleOverdue();
+  const overdueAmt = overdue.reduce((a, c) => a + state.stats.get(c.id).balance, 0);
   const pendingTx = state.txs.filter((t) => t.status === 'pending');
-  const pendingAcc = all.filter((r) => !r.active);
+  const pendingAcc = reps().filter((r) => !r.active);
+  const recent = state.txs.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, 6);
   return `
-  <section class="summary">
-    <div><span class="eyebrow">إجمالي الآجل في السوق</span><b>${egp(total)}</b></div>
-    <div><span class="eyebrow">تحصيل ${monthLabel(monthKey(Date.now()))}</span><b>${egp(month)}</b></div>
-    <div class="${stopped ? 'bad' : ''}"><span class="eyebrow">مناديب فوق الحد</span><b>${stopped}</b></div>
-    <div class="${overdue.length ? 'bad' : ''}"><span class="eyebrow">عملاء متأخرين</span><b>${overdue.length}</b></div>
-  </section>
-
-  ${pendingAcc.length ? `<section class="card attn"><div class="sec-head"><h2>حسابات جديدة مستنية تفعيل</h2></div>
-    <div class="stack">${pendingAcc.map((r) => `<form class="inline-form" data-form="activate" data-id="${r.id}">
-      <div><b>${esc(r.full_name)}</b><small class="sub" dir="ltr">@${esc(r.username)}</small></div>
-      <label>حد الائتمان<input name="limit" inputmode="decimal" placeholder="مثلاً 500000" required></label>
-      <button class="primary sm">تفعيل</button></form>`).join('')}</div></section>` : ''}
-
-  ${pendingTx.length ? `<section class="card attn"><div class="sec-head"><h2>طلبات تصحيح مستنية موافقتك</h2></div>${pendingList(pendingTx)}</section>` : ''}
-
+  <div class="kpis four">
+    ${kpi('wallet', 'إجمالي الآجل في السوق', money(total), `${sums.length} مندوب نشط`)}
+    ${kpi('down', 'تحصيل الشهر', money(month), monthLabel(monthKey(Date.now())), 'ok')}
+    ${kpi('lock', 'مناديب تجاوزوا الحد', stopped, stopped ? 'موقوفين عن الآجل' : 'الكل داخل الحد', stopped ? 'bad' : '')}
+    ${kpi('alert', 'عملاء متأخرين', overdue.length, `بإجمالي ${money(overdueAmt)} ج.م`, overdue.length ? 'bad' : '')}
+  </div>
+  ${pendingTx.length || pendingAcc.length ? `<div class="banner warn">${ic('bell')}<div><b>مطلوب منك مراجعة</b><span>${[pendingTx.length ? `${pendingTx.length} طلب تصحيح` : '', pendingAcc.length ? `${pendingAcc.length} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</span></div>
+    <div class="btns">${pendingTx.length ? '<button class="btn secondary sm" data-act="nav" data-k="approvals">مراجعة الطلبات</button>' : ''}${pendingAcc.length ? '<button class="btn secondary sm" data-act="nav" data-k="accounts">تفعيل الحسابات</button>' : ''}</div></div>` : ''}
   <section class="card">
-    <div class="sec-head"><h2>المناديب</h2><span class="muted">دوس على المندوب تشوف عملاءه</span></div>
-    <div class="reps">${sums.sort((a, b) => b.s.pct - a.s.pct).map(({ r, s }) => `
-      <button class="rep ${s.over ? 'is-bad' : ''}" data-act="open-rep" data-id="${r.id}">
-        <div class="rep-h"><b>${esc(r.full_name)}</b>${s.over ? '<span class="chip bad">موقوف</span>' : ''}</div>
-        <div class="rep-n">${egp(s.total)}</div>
-        <small class="sub">من حد ${money(s.limit)}</small>
-        ${meter(s)}
-        <div class="rep-f"><span>${s.customers.length} عميل</span><span>تحصيل الشهر ${money(s.month)}</span>${s.overdue ? `<span class="t-bad">${s.overdue} متأخر</span>` : ''}</div>
-      </button>`).join('') || '<div class="empty">لسه مفيش مناديب مفعلين.</div>'}
-    </div>
+    <div class="card-h"><div><h2>المناديب</h2><small class="sub">اضغط على المندوب لعرض عملائه</small></div><button class="btn ghost sm" data-act="nav" data-k="reps">عرض الكل</button></div>
+    ${repCards(sums)}
   </section>
+  <div class="grid-2 even">
+    <section class="card">
+      <div class="card-h"><h2>أكثر العملاء تأخيراً</h2><button class="btn ghost sm" data-act="nav" data-k="overdue">عرض الكل</button></div>
+      ${overdue.length ? `<ul class="mini">${overdue.slice(0, 6).map((c) => { const s = state.stats.get(c.id); return `<li data-act="open-customer" data-id="${c.id}"><span class="av bad">${esc(initials(c.name))}</span><div><b>${esc(c.name)}</b><small class="sub">${esc(profileName(c.rep_id))}</small></div><div class="mini-v"><b>${money(s.balance)}</b><span class="pill bad"><i></i>${s.overdueDays} يوم</span></div></li>`; }).join('')}</ul>` : `<div class="empty">${ic('check')}<p>لا يوجد عملاء متأخرين.</p></div>`}
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>آخر التحصيلات</h2></div>
+      ${recent.length ? `<ul class="mini">${recent.map((t) => { const c = state.customers.find((x) => x.id === t.customer_id); return `<li data-act="open-customer" data-id="${t.customer_id}"><span class="av ok">${ic('down')}</span><div><b>${esc(c?.name || '')}</b><small class="sub">${esc(profileName(t.created_by))} · ${fmtDT(t.occurred_at)}</small></div><div class="mini-v"><b class="t-ok">+${money(t.amount)}</b></div></li>`; }).join('')}</ul>` : `<div class="empty"><p>لا توجد تحصيلات بعد.</p></div>`}
+    </section>
+  </div>`;
+}
 
-  <section class="card">
-    <div class="sec-head"><h2>العملاء المتأخرين (+${TERM_DAYS} يوم)</h2></div>
-    ${overdue.length ? customerTable(overdue, { showRep: true, actions: false }) : '<div class="empty">مفيش عملاء متأخرين.</div>'}
+function viewReps() {
+  return `<section class="card"><div class="card-h"><div><h2>كل المناديب</h2><small class="sub">مرتبين حسب نسبة استخدام حد الائتمان</small></div></div>${repCards(adminSums())}</section>`;
+}
+
+function viewOverdue() {
+  const list = visibleOverdue();
+  const amt = list.reduce((a, c) => a + state.stats.get(c.id).balance, 0);
+  return `<section class="card">
+    <div class="card-h"><div><h2>عملاء تجاوزوا ${TERM_DAYS} يوم</h2><small class="sub">${list.length} عميل بإجمالي ${money(amt)} ج.م</small></div></div>
+    ${list.length ? customerTable(list, { showRep: state.me.role === 'admin', actions: true }) : `<div class="empty">${ic('check')}<p>لا يوجد عملاء متأخرين.</p></div>`}
   </section>`;
+}
+
+function viewApprovals() {
+  const list = state.txs.filter((t) => t.status === 'pending');
+  const done = state.txs.filter((t) => t.kind === 'correction' && t.status !== 'pending').sort((a, b) => new Date(b.reviewed_at || b.created_at) - new Date(a.reviewed_at || a.created_at)).slice(0, 15);
+  return `<section class="card"><div class="card-h"><div><h2>طلبات بانتظار الموافقة</h2><small class="sub">المندوب لا يستطيع تعديل أو حذف أي حركة. التصحيح يُطبق فقط بعد موافقتك.</small></div></div>
+    ${list.length ? pendingList(list) : `<div class="empty">${ic('check')}<p>لا توجد طلبات معلقة.</p></div>`}</section>
+    ${done.length ? `<section class="card"><div class="card-h"><h2>سجل التصحيحات</h2></div>${pendingList(done)}</section>` : ''}`;
+}
+
+function viewAccounts() {
+  const list = reps().filter((r) => !r.active);
+  return `<section class="card"><div class="card-h"><div><h2>حسابات بانتظار التفعيل</h2><small class="sub">حدد حد الائتمان لكل مندوب ثم فعّل الحساب.</small></div></div>
+    ${list.length ? `<div class="stack">${list.map((r) => `<form class="row-form" data-form="activate" data-id="${r.id}">
+      <div class="who-cell"><span class="avatar">${esc(r.full_name.charAt(0))}</span><div><b>${esc(r.full_name)}</b><small class="sub" dir="ltr">@${esc(r.username)} · ${fmtDate(r.created_at)}</small></div></div>
+      <label class="fl">حد الائتمان (ج.م)<input name="limit" inputmode="decimal" placeholder="500,000" required></label>
+      <button class="btn primary">${ic('check')}تفعيل</button></form>`).join('')}</div>` : `<div class="empty">${ic('userplus')}<p>لا توجد حسابات جديدة.</p></div>`}</section>`;
 }
 
 function pendingList(list) {
   return `<div class="stack">${list.map((t) => {
     const c = state.customers.find((x) => x.id === t.customer_id);
     const admin = state.me.role === 'admin';
-    return `<div class="pending">
-      <div><b>${esc(c?.name || '')}</b> <small class="sub">${esc(profileName(t.created_by))} · ${fmtDT(t.created_at)}</small>
-      <p>${t.amount < 0 ? 'تقليل المديونية' : 'زيادة المديونية'} بـ <b>${money(Math.abs(t.amount))}</b> ج.م · ${esc(t.note)}</p></div>
-      ${admin ? `<div class="btns"><button class="primary sm" data-act="approve" data-id="${t.id}">موافقة</button><button class="ghost sm" data-act="reject" data-id="${t.id}">رفض</button></div>` : '<span class="chip pend">مستني الإدارة</span>'}
+    const st = t.status === 'pending' ? '' : t.status === 'approved' ? '<span class="pill ok"><i></i>تمت الموافقة</span>' : '<span class="pill neutral"><i></i>مرفوض</span>';
+    return `<div class="req">
+      <span class="req-ic ${t.amount < 0 ? 'ok' : 'bad'}">${ic('edit')}</span>
+      <div class="req-b"><div><b>${esc(c?.name || '')}</b> <span class="muted">· ${esc(profileName(t.created_by))} · ${fmtDT(t.created_at)}</span></div>
+      <p><b>${t.amount < 0 ? 'تقليل المديونية' : 'زيادة المديونية'} ${money(Math.abs(t.amount))} ج.م</b> — ${esc(t.note)}</p></div>
+      ${t.status === 'pending' ? (admin ? `<div class="btns"><button class="btn ghost sm" data-act="reject" data-id="${t.id}">رفض</button><button class="btn primary sm" data-act="approve" data-id="${t.id}">${ic('check')}موافقة</button></div>` : '<span class="pill pend"><i></i>بانتظار الإدارة</span>') : st}
     </div>`;
   }).join('')}</div>`;
 }
@@ -554,29 +710,22 @@ function pendingList(list) {
 /* ----- admin: one rep ----- */
 function viewRepDetail(id) {
   const r = state.profiles.find((p) => p.id === id);
-  if (!r) return '<div class="empty">المندوب مش موجود.</div>';
+  if (!r) return `<div class="empty"><p>المندوب غير موجود.</p></div>`;
   const s = repSummary(r, state.customers, state.stats);
   return `
-  <button class="back" data-act="back">→ رجوع</button>
-  <section class="hero ${s.over ? 'is-bad' : ''}">
-    <div class="hero-main">
-      <span class="eyebrow">${esc(r.full_name)} · <span dir="ltr">@${esc(r.username)}</span></span>
-      <div class="big">${egp(s.total)}</div>
-      <form class="inline-form tight" data-form="limit" data-id="${r.id}">
-        <label>حد الائتمان<input name="limit" inputmode="decimal" value="${money(r.credit_limit)}"></label>
-        <button class="secondary sm">حفظ الحد</button>
-      </form>
-      ${meter(s)}
+  <div class="grid-2">
+    ${creditCard(s, 'مديونية ' + esc(r.full_name), `<form class="limit-form" data-form="limit" data-id="${r.id}">
+        <label class="fl">تعديل حد الائتمان<input name="limit" inputmode="decimal" value="${money(r.credit_limit)}"></label>
+        <button class="btn secondary sm">حفظ</button></form>`)}
+    <div class="kpis">
+      ${kpi('down', 'تحصيل الشهر', money(s.month), monthLabel(monthKey(Date.now())), 'ok')}
+      ${kpi('store', 'عدد العملاء', s.customers.length)}
+      ${kpi('alert', 'عملاء متأخرين', s.overdue, '', s.overdue ? 'bad' : '')}
+      ${kpi('shield', 'حالة الحساب', s.over ? 'موقوف' : 'نشط', s.over ? 'تجاوز الحد' : 'داخل الحد', s.over ? 'bad' : 'ok')}
     </div>
-    <dl class="kpis">
-      <div><dt>تحصيل الشهر ده</dt><dd>${money(s.month)}</dd></div>
-      <div><dt>عملاء</dt><dd>${s.customers.length}</dd></div>
-      <div class="${s.overdue ? 'bad' : ''}"><dt>متأخرين</dt><dd>${s.overdue}</dd></div>
-      <div><dt>قطاعي / جملة</dt><dd class="small">${money(s.retail)} / ${money(s.wholesale)}</dd></div>
-    </dl>
-  </section>
+  </div>
   <section class="card">
-    <div class="sec-head"><h2>عملاء ${esc(r.full_name)}</h2><button class="ghost sm" data-act="toggle-active" data-id="${r.id}">إيقاف الحساب</button></div>
+    <div class="card-h"><div><h2>عملاء ${esc(r.full_name)}</h2></div><button class="btn ghost sm danger" data-act="toggle-active" data-id="${r.id}">${ic('lock')}إيقاف الحساب</button></div>
     ${listTools()}
     ${customerTable(s.customers, { actions: false })}
   </section>`;
@@ -585,11 +734,10 @@ function viewRepDetail(id) {
 /* ----- customer detail (both roles) ----- */
 function viewCustomer(id) {
   const c = state.customers.find((x) => x.id === id);
-  if (!c) return '<div class="empty">العميل مش موجود.</div>';
+  if (!c) return `<div class="empty"><p>العميل غير موجود.</p></div>`;
   const s = state.stats.get(id);
   const isRep = state.me.role === 'rep';
   const repSum = repSummary(state.profiles.find((p) => p.id === c.rep_id) || state.me, state.customers, state.stats);
-  // running balance (oldest first), shown newest first
   let run = 0;
   const rows = s.list.map((t) => { run += effect(t); return { t, run }; });
   const months = [...new Set(s.list.map((t) => monthKey(t.occurred_at)))].sort().reverse();
@@ -599,106 +747,119 @@ function viewCustomer(id) {
     return { k, debit: ts.filter((t) => effect(t) > 0).reduce((a, t) => a + effect(t), 0), credit: ts.filter((t) => effect(t) < 0).reduce((a, t) => a - effect(t), 0) };
   });
   const pending = s.list.filter((t) => t.status === 'pending');
+  const kindIc = { opening: 'archive', invoice: 'file', collection: 'down', correction: 'edit' };
   return `
-  <button class="back" data-act="back">→ رجوع</button>
-  <section class="cust ${s.overdue ? 'is-bad' : ''}">
-    <div class="cust-id">
-      <h1>${esc(c.name)}</h1>
-      <div class="facts">
-        ${c.phone ? `<span>📞 <b dir="ltr" class="sel">${esc(c.phone)}</b></span>` : ''}
-        ${c.location ? `<span>📍 ${esc(c.location)}</span>` : ''}
-        <span class="chip type">${TYPE[c.debt_type]}</span>
-        ${!isRep ? `<span class="muted">المندوب: ${esc(profileName(c.rep_id))}</span>` : ''}
+  <section class="card profile ${s.overdue ? 'is-bad' : ''}">
+    <div class="profile-h">
+      <span class="av lg ${s.overdue ? 'bad' : ''}">${esc(initials(c.name))}</span>
+      <div class="profile-t">
+        <div class="pt-row"><h2>${esc(c.name)}</h2><span class="tag">${TYPE[c.debt_type]}</span>${statusChip(s)}</div>
+        <div class="facts">
+          ${c.phone ? `<span>${ic('phone')}<b dir="ltr" class="sel">${esc(c.phone)}</b></span>` : ''}
+          ${c.location ? `<span>${ic('pin')}${esc(c.location)}</span>` : ''}
+          ${!isRep ? `<span>${ic('users')}${esc(profileName(c.rep_id))}</span>` : ''}
+          <span>${ic('clock')}عميل منذ ${fmtDate(c.created_at)}</span>
+        </div>
+      </div>
+      <div class="btns">
+        ${isRep ? `<button class="btn ghost" data-act="correction" data-id="${c.id}">${ic('edit')}طلب تصحيح</button>
+        <button class="btn secondary" data-act="invoice" data-id="${c.id}" ${repSum.over ? 'disabled title="موقوف: تجاوز حد الائتمان"' : ''}>${ic('file')}فاتورة آجل</button>
+        <button class="btn primary" data-act="collect" data-id="${c.id}" ${s.balance <= 0 ? 'disabled' : ''}>${ic('wallet')}تحصيل</button>` :
+        `<button class="btn secondary" data-act="correction" data-id="${c.id}">${ic('edit')}تصحيح الرصيد</button>`}
       </div>
     </div>
-    <dl class="kpis">
-      <div class="${s.overdue ? 'bad' : ''}"><dt>عليه دلوقتي</dt><dd>${money(s.balance)}</dd></div>
-      <div><dt>تحصيل الشهر ده</dt><dd>${money(s.monthCollected)}</dd></div>
-      <div class="${s.overdue ? 'bad' : ''}"><dt>الأجل</dt><dd class="small">${s.balance > 0 ? (s.overdue ? `متأخر ${s.overdueDays} يوم` : `آخر يوم ${fmtDate(s.dueDate)}`) : 'خالص'}</dd></div>
-      <div><dt>آخر تحصيل</dt><dd class="small">${s.lastCollection ? fmtDate(s.lastCollection) : '—'}</dd></div>
-    </dl>
-    <div class="btns">
-      ${isRep ? `<button class="primary" data-act="collect" data-id="${c.id}" ${s.balance <= 0 ? 'disabled' : ''}>تحصيل</button>
-      <button class="secondary" data-act="invoice" data-id="${c.id}" ${repSum.over ? 'disabled title="موقوف: فوق حد الائتمان"' : ''}>فاتورة آجل</button>
-      <button class="ghost" data-act="correction" data-id="${c.id}">طلب تصحيح</button>` :
-      `<button class="secondary" data-act="correction" data-id="${c.id}">تصحيح (من الإدارة)</button>`}
+    <div class="stats">
+      <div class="${s.overdue ? 'bad' : ''}"><span>الرصيد المستحق</span><b>${money(s.balance)} <small>ج.م</small></b></div>
+      <div><span>تحصيل الشهر</span><b class="t-ok">${money(s.monthCollected)} <small>ج.م</small></b></div>
+      <div class="${s.overdue ? 'bad' : ''}"><span>${s.overdue ? 'التأخير' : 'آخر يوم في الأجل'}</span><b>${s.balance > 0 ? (s.overdue ? `${s.overdueDays} يوم` : fmtDate(s.dueDate)) : '—'}</b></div>
+      <div><span>آخر تحصيل</span><b>${s.lastCollection ? fmtDate(s.lastCollection) : '—'}</b></div>
     </div>
   </section>
 
-  ${pending.length ? `<section class="card attn"><div class="sec-head"><h2>طلبات تصحيح معلقة</h2></div>${pendingList(pending)}</section>` : ''}
+  ${pending.length ? `<section class="card"><div class="card-h"><h2>طلبات تصحيح معلقة</h2></div>${pendingList(pending)}</section>` : ''}
 
-  <section class="card">
-    <div class="sec-head"><h2>كشف الحساب</h2>
-      <select id="month" aria-label="الشهر"><option value="all">كل الحركات</option>${months.map((k) => `<option value="${k}" ${state.monthFilter === k ? 'selected' : ''}>${monthLabel(k)}</option>`).join('')}</select>
-    </div>
-    <div class="table-scroll"><table class="grid ledger">
-      <thead><tr><th>التاريخ</th><th>الحركة</th><th class="num">عليه (+)</th><th class="num">دفع (−)</th><th class="num">الرصيد</th><th>سجّلها</th><th>ملاحظة</th></tr></thead>
-      <tbody>${shown.map(({ t, run }) => {
-        const e = t.kind === 'collection' ? -t.amount : Number(t.amount);
-        const off = t.status !== 'approved';
-        return `<tr class="${off ? 'row-off' : ''} k-${t.kind}">
-          <td class="nowrap">${fmtDT(t.occurred_at)}</td>
-          <td>${KIND[t.kind]}${t.status === 'pending' ? ' <span class="chip pend">معلق</span>' : t.status === 'rejected' ? ' <span class="chip neutral">مرفوض</span>' : ''}</td>
-          <td class="num">${e > 0 ? money(e) : ''}</td>
-          <td class="num t-ok">${e < 0 ? money(-e) : ''}</td>
-          <td class="num strong">${off ? '<span class="muted">—</span>' : money(run)}</td>
-          <td>${esc(profileName(t.created_by))}</td>
-          <td class="note">${esc(t.note || '')}</td>
-        </tr>`;
-      }).join('') || '<tr><td colspan="7" class="empty">مفيش حركات.</td></tr>'}</tbody>
-    </table></div>
-  </section>
-
-  <section class="card">
-    <div class="sec-head"><h2>ملخص شهري (الأرشيف)</h2><span class="muted">محفوظ دايماً ولا يُحذف</span></div>
-    <div class="table-scroll"><table class="grid">
-      <thead><tr><th>الشهر</th><th class="num">فواتير / زيادة</th><th class="num">تحصيل / خصم</th></tr></thead>
-      <tbody>${byMonth.map((m) => `<tr data-act="month" data-k="${m.k}"><td>${monthLabel(m.k)}</td><td class="num">${money(m.debit)}</td><td class="num t-ok">${money(m.credit)}</td></tr>`).join('')}</tbody>
-    </table></div>
-  </section>`;
+  <div class="grid-ledger">
+    <section class="card">
+      <div class="card-h"><div><h2>كشف الحساب</h2><small class="sub">${shown.length} حركة</small></div>
+        <select id="month" aria-label="الشهر"><option value="all">كل الفترات</option>${months.map((k) => `<option value="${k}" ${state.monthFilter === k ? 'selected' : ''}>${monthLabel(k)}</option>`).join('')}</select>
+      </div>
+      <div class="table-scroll"><table class="grid ledger">
+        <thead><tr><th>التاريخ</th><th>البيان</th><th class="num">مدين</th><th class="num">دائن</th><th class="num">الرصيد</th><th>بواسطة</th></tr></thead>
+        <tbody>${shown.map(({ t, run }) => {
+          const e = t.kind === 'collection' ? -t.amount : Number(t.amount);
+          const off = t.status !== 'approved';
+          return `<tr class="${off ? 'row-off' : ''}">
+            <td class="nowrap muted-c">${fmtDT(t.occurred_at)}</td>
+            <td><div class="kind k-${t.kind}">${ic(kindIc[t.kind])}<div><b>${KIND[t.kind]}</b>${t.status === 'pending' ? ' <span class="pill pend"><i></i>معلق</span>' : t.status === 'rejected' ? ' <span class="pill neutral"><i></i>مرفوض</span>' : ''}${t.note && t.note !== 'رصيد افتتاحي' ? `<small class="sub">${esc(t.note)}</small>` : ''}</div></div></td>
+            <td class="num">${e > 0 ? money(e) : ''}</td>
+            <td class="num t-ok">${e < 0 ? money(-e) : ''}</td>
+            <td class="num strong">${off ? '<span class="muted">—</span>' : money(run)}</td>
+            <td class="muted-c nowrap">${esc(profileName(t.created_by))}</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="6"><div class="empty"><p>لا توجد حركات.</p></div></td></tr>'}</tbody>
+      </table></div>
+    </section>
+    <section class="card">
+      <div class="card-h"><div><h2>الأرشيف الشهري</h2><small class="sub">محفوظ دائماً ولا يُحذف</small></div></div>
+      <ul class="months">${byMonth.map((m) => `<li data-act="month" data-k="${m.k}" class="${state.monthFilter === m.k ? 'on' : ''}"><b>${monthLabel(m.k)}</b><span><small>مدين</small>${money(m.debit)}</span><span class="t-ok"><small>محصّل</small>${money(m.credit)}</span></li>`).join('')}</ul>
+    </section>
+  </div>`;
 }
 
 /* ----- auth screens ----- */
+function authShell(inner) {
+  return `<div class="auth">
+    <section class="auth-art">
+      <div class="aa-brand"><span class="logo" aria-hidden="true">${ic('store')}</span><div><b>السلطان للتوزيع</b><small>السويس</small></div></div>
+      <div class="aa-copy">
+        <h2>دفتر مديونيات المناديب</h2>
+        <p>تسجيل العملاء والتحصيل اليومي، ومتابعة لحظية للإدارة، وأرشيف كامل لا يُحذف.</p>
+        <ul>
+          <li>${ic('zap')}<span>تحديث لحظي بين المندوب والإدارة بدون إعادة تحميل</span></li>
+          <li>${ic('shield')}<span>حد ائتمان لكل مندوب وإيقاف تلقائي عند تجاوزه</span></li>
+          <li>${ic('clock')}<span>تنبيه بالعملاء المتأخرين بعد ${TERM_DAYS} يوم من الفاتورة</span></li>
+          <li>${ic('archive')}<span>سجل دائم لكل حركة: من سجّلها ومتى</span></li>
+        </ul>
+      </div>
+      <small class="aa-foot">© ${new Date().getFullYear()} السلطان للتوزيع</small>
+    </section>
+    <section class="auth-form"><div class="auth-card">${inner}</div></section>
+  </div>`;
+}
+
 function renderAuth() {
   const tab = state.authTab;
-  root().innerHTML = `
-  <main class="auth">
-    <div class="auth-card">
-      <div class="auth-brand"><span class="mark" aria-hidden="true">س</span><div><h1>السلطان للتوزيع</h1><p>دفتر مديونيات المناديب</p></div></div>
-      <div class="seg wide" role="tablist">
-        <button class="${tab === 'login' ? 'on' : ''}" data-act="auth-tab" data-k="login">دخول</button>
-        <button class="${tab === 'signup' ? 'on' : ''}" data-act="auth-tab" data-k="signup">حساب مندوب جديد</button>
-      </div>
+  root().innerHTML = authShell(`
+      <div class="m-brand"><span class="logo" aria-hidden="true">${ic('store')}</span><b>السلطان للتوزيع</b></div>
+      <div><h1>${tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p class="muted">${tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تقوم الإدارة بتفعيل الحساب وتحديد حد الائتمان.'}</p></div>
       ${tab === 'login' ? `
       <form data-form="login" class="form">
-        <label>اسم المستخدم<input id="login-user" name="username" autocomplete="username" dir="ltr" required></label>
-        <label>كلمة المرور<input id="login-pass" name="password" type="password" autocomplete="current-password" dir="ltr" required></label>
-        <button class="primary block">دخول</button>
-      </form>` : `
+        <label class="fl">اسم المستخدم<input id="login-user" name="username" autocomplete="username" dir="ltr" required></label>
+        <label class="fl">كلمة المرور<input id="login-pass" name="password" type="password" autocomplete="current-password" dir="ltr" required></label>
+        <button class="btn primary block lg">دخول</button>
+      </form>
+      <p class="switch">مندوب جديد؟ <button class="link" data-act="auth-tab" data-k="signup">إنشاء حساب</button></p>` : `
       <form data-form="signup" class="form">
-        <label>الاسم بالكامل<input id="su-name" name="full_name" required></label>
-        <label>اسم المستخدم (إنجليزي)<input id="su-user" name="username" dir="ltr" pattern="[A-Za-z0-9_.\\-]{3,30}" title="3 حروف على الأقل، إنجليزي أو أرقام" required></label>
-        <label>كلمة المرور<input id="su-pass" name="password" type="password" dir="ltr" minlength="6" required></label>
-        <p class="hint">بعد التسجيل الإدارة بتفعل حسابك وتحدد حد الائتمان بتاعك.</p>
-        <button class="primary block">إنشاء الحساب</button>
-      </form>`}
+        <label class="fl">الاسم بالكامل<input id="su-name" name="full_name" required></label>
+        <label class="fl">اسم المستخدم (حروف إنجليزية)<input id="su-user" name="username" dir="ltr" pattern="[A-Za-z0-9_.\\-]{3,30}" title="3 حروف على الأقل، إنجليزي أو أرقام" required></label>
+        <label class="fl">كلمة المرور<input id="su-pass" name="password" type="password" dir="ltr" minlength="6" required></label>
+        <button class="btn primary block lg">إنشاء الحساب</button>
+      </form>
+      <p class="switch">لديك حساب؟ <button class="link" data-act="auth-tab" data-k="login">تسجيل الدخول</button></p>`}
       <div class="form-msg" id="auth-msg" role="status"></div>
       ${api.mode === 'demo' ? `<div class="demo">
-        <b>نسخة تجريبية - جرّب بأي حساب (كلمة المرور 1234):</b>
+        <span class="demo-h">${ic('zap')}نسخة تجريبية · دخول سريع (كلمة المرور 1234)</span>
         <div class="demo-list">
-          ${[['sayed', 'سيد (إدارة)'], ['mohamed', 'محمد (إدارة)'], ['ahmed', 'أحمد - حد مليون'], ['mahmoud', 'محمود - حد 500 ألف'], ['karim', 'كريم - حد 200 ألف (موقوف)']].map(([u, l]) => `<button class="chipbtn" data-act="demo-login" data-u="${u}">${l}</button>`).join('')}
+          ${[['sayed', 'سيد', 'مدير'], ['mohamed', 'محمد', 'مدير'], ['ahmed', 'أحمد', 'حد 1,000,000'], ['mahmoud', 'محمود', 'حد 500,000'], ['karim', 'كريم', 'حد 200,000 · موقوف']].map(([u, n, l]) => `<button class="demo-acc" data-act="demo-login" data-u="${u}"><span class="avatar">${n.charAt(0)}</span><span><b>${n}</b><small>${l}</small></span></button>`).join('')}
         </div>
-      </div>` : ''}
-    </div>
-  </main>`;
+      </div>` : ''}`);
 }
 
 function renderInactive() {
-  root().innerHTML = `<main class="auth"><div class="auth-card">
-    <div class="auth-brand"><span class="mark" aria-hidden="true">س</span><div><h1>أهلاً ${esc(state.me.full_name)}</h1><p>حسابك مستني تفعيل</p></div></div>
-    <p>الإدارة لازم تفعل حسابك وتحدد حد الائتمان قبل ما تبدأ. الصفحة دي هتتحدث لوحدها أول ما يتفعل.</p>
-    <button class="ghost block" data-act="logout">خروج</button>
-  </div></main>`;
+  root().innerHTML = authShell(`
+    <span class="big-ic">${ic('clock')}</span>
+    <div><h1>أهلاً ${esc(state.me.full_name)}</h1><p class="muted">حسابك بانتظار التفعيل من الإدارة وتحديد حد الائتمان. ستتحدث هذه الصفحة تلقائياً فور التفعيل.</p></div>
+    <button class="btn ghost block" data-act="logout">${ic('logout')}تسجيل الخروج</button>`);
 }
 
 /* ---------------- modals ---------------- */
@@ -707,7 +868,7 @@ function modal(title, inner, onSubmit) {
   const el = document.createElement('div');
   el.className = 'overlay';
   el.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <div class="modal-h"><h3>${esc(title)}</h3><button class="x" data-close aria-label="إغلاق">×</button></div>
+    <div class="modal-h"><h3>${esc(title)}</h3><button class="icon-btn" data-close aria-label="إغلاق">${ic('x')}</button></div>
     <form class="form" novalidate>${inner}<div class="form-msg" role="status"></div></form></div>`;
   document.body.appendChild(el);
   const form = el.querySelector('form');
@@ -735,7 +896,7 @@ function openCollect(cid) {
     ${amountField('amount', 'المبلغ اللي استلمته')}
     <div class="preview" id="pv">الرصيد بعد التحصيل: <b>${money(s.balance)}</b></div>
     <label>ملاحظة (اختياري)<input id="f-note" name="note" placeholder="مثلاً: كاش / شيك رقم …"></label>
-    <button class="primary block">تسجيل التحصيل</button>`,
+    <button class="btn primary block lg">تسجيل التحصيل</button>`,
     async (fd) => {
       const amount = parseAmount(fd.get('amount'));
       if (!(amount > 0)) throw new Error('اكتب المبلغ بالأرقام');
@@ -762,7 +923,7 @@ function openInvoice(cid) {
     ${amountField('amount', 'قيمة الفاتورة')}
     <label>رقم الفاتورة / ملاحظة<input id="f-note" name="note" placeholder="مثلاً: فاتورة 1543"></label>
     <p class="hint">آخر يوم للأجل: ${due}. من بعده العميل يتعلم بالأحمر.</p>
-    <button class="primary block">تسجيل الفاتورة</button>`,
+    <button class="btn primary block lg">تسجيل الفاتورة</button>`,
     async (fd) => {
       const id = cid || fd.get('customer');
       if (!id) throw new Error('اختار العميل');
@@ -791,7 +952,7 @@ function openAddCustomer() {
       <label>تاريخ أقدم فاتورة مفتوحة<input id="f-odate" name="opening_date" type="date" value="${today}" min="${minD}" max="${today}"></label>
     </div>
     <div class="form-msg warn" id="dup"></div>
-    <button class="primary block">حفظ العميل</button>`,
+    <button class="btn primary block lg">حفظ العميل</button>`,
     async (fd) => {
       const name = String(fd.get('name') || '').trim();
       if (!name) throw new Error('اكتب اسم العميل');
@@ -822,7 +983,7 @@ function openCorrection(cid) {
     ${amountField('amount', 'قيمة التصحيح')}
     <label>السبب (إجباري)<textarea id="f-note" name="note" rows="2" required placeholder="مثلاً: تحصيل 2000 يوم 12 اتسجل 20000 غلط"></textarea></label>
     <p class="hint">${admin ? 'التصحيح من الإدارة بيتطبق فوراً ويفضل ظاهر في كشف الحساب.' : 'المندوب ما يقدرش يعدل أو يمسح حركة. الطلب بيروح للإدارة، ولما يتوافق عليه يتطبق.'}</p>
-    <button class="primary block">${admin ? 'تطبيق التصحيح' : 'إرسال الطلب للإدارة'}</button>`,
+    <button class="btn primary block lg">${admin ? 'تطبيق التصحيح' : 'إرسال الطلب للإدارة'}</button>`,
     async (fd) => {
       const amount = parseAmount(fd.get('amount'));
       const note = String(fd.get('note') || '').trim();
@@ -839,10 +1000,10 @@ function openBell() {
   if (!p.hidden) { p.hidden = true; return; }
   const list = visibleOverdue();
   const canNotify = 'Notification' in window;
-  p.innerHTML = `<div class="wrap"><div class="panel-in">
-    <div class="sec-head"><h3>عملاء عدّوا ${TERM_DAYS} يوم</h3>${canNotify && Notification.permission === 'default' ? '<button class="link" data-act="enable-notify">فعّل إشعارات المتصفح</button>' : ''}</div>
+  p.innerHTML = `<div class="panel-in">
+    <div class="sec-head"><h3>${ic('bell')} عملاء تجاوزوا ${TERM_DAYS} يوم</h3>${canNotify && Notification.permission === 'default' ? '<button class="link" data-act="enable-notify">فعّل إشعارات المتصفح</button>' : ''}</div>
     ${list.length ? `<ul class="notes">${list.slice(0, 40).map((c) => { const s = state.stats.get(c.id); return `<li data-act="open-customer" data-id="${c.id}"><b>${esc(c.name)}</b><span>${money(s.balance)} ج.م · متأخر ${s.overdueDays} يوم${state.me.role === 'admin' ? ' · ' + esc(profileName(c.rep_id)) : ''}</span></li>`; }).join('')}</ul>` : '<div class="empty">مفيش تنبيهات.</div>'}
-  </div></div>`;
+  </div>`;
   p.hidden = false;
 }
 function closePanels() { const p = $('#bell-panel'); if (p) p.hidden = true; }
@@ -871,7 +1032,8 @@ document.addEventListener('click', async (e) => {
   if (act !== 'bell' && !el.closest('#bell-panel')) closePanels();
   try {
     switch (act) {
-      case 'home': state.view = { name: 'home' }; state.stack = []; render(); break;
+      case 'home': nav('home'); break;
+      case 'nav': nav(el.dataset.k); break;
       case 'back': back(); break;
       case 'logout': await api.signOut(); state.me = null; state.view = { name: 'home' }; state.stack = []; render(); break;
       case 'bell': openBell(); break;
