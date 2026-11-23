@@ -393,9 +393,10 @@ function navItems() {
     return [
       ['home', 'home', 'لوحة التحكم', 0],
       ['reps', 'users', 'المناديب', 0],
-      ['overdue', 'alert', 'العملاء المتأخرين', visibleOverdue().length],
-      ['approvals', 'check', 'طلبات التصحيح', pendTx],
-      ['accounts', 'userplus', 'الحسابات الجديدة', pendAcc],
+      ['customers', 'store', 'العملاء', 0],
+      ['overdue', 'alert', 'المتأخرين', visibleOverdue().length],
+      ['approvals', 'check', 'التصحيحات', pendTx],
+      ['accounts', 'userplus', 'الحسابات', pendAcc],
     ];
   }
   return [
@@ -411,7 +412,7 @@ function activeNav() {
   return v;
 }
 
-const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'الحسابات الجديدة' };
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'الحسابات الجديدة' };
 
 function crumbs() {
   const v = state.view;
@@ -430,59 +431,136 @@ function crumbs() {
 
 function render() {
   closePanels();
+  hideTip();
   if (!state.me) return renderAuth();
   if (!state.me.active) return renderInactive();
   const v = state.view;
   let body = '';
   if (v.name === 'customer') body = viewCustomer(v.id);
   else if (state.me.role === 'admin') {
-    body = ({ rep: () => viewRepDetail(v.id), reps: viewReps, overdue: viewOverdue, approvals: viewApprovals, accounts: viewAccounts }[v.name] || viewAdminHome)();
+    body = ({ rep: () => viewRepDetail(v.id), reps: viewReps, customers: viewAllCustomers, overdue: viewOverdue, approvals: viewApprovals, accounts: viewAccounts }[v.name] || viewAdminHome)();
   } else body = v.name === 'overdue' ? viewOverdue() : viewRepHome();
   const items = navItems();
   const act = activeNav();
   const cr = crumbs();
+  const nOver = visibleOverdue().length;
   root().innerHTML = `
-  <div class="shell">
-    <aside class="side">
-      <button class="side-brand" data-act="nav" data-k="home">
+  <header class="nav">
+    <div class="nav-in">
+      <button class="brand" data-act="nav" data-k="home">
         <span class="logo" aria-hidden="true">${ic('store')}</span>
-        <span><b>السلطان</b><small>للتوزيع · السويس</small></span>
+        <span><b>السلطان للتوزيع</b><small>دفتر المديونيات</small></span>
       </button>
-      <nav class="side-nav">
-        <span class="side-label">${state.me.role === 'admin' ? 'الإدارة' : 'المندوب'}</span>
-        ${items.map(([k, i, l, n]) => `<button class="nav-i ${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em class="${k === 'overdue' ? 'bad' : ''}">${n}</em>` : ''}</button>`).join('')}
-      </nav>
-      <div class="side-foot">
-        <div class="live" id="live"><i></i><span>متصل · تحديث لحظي</span></div>
-        <div class="me">
-          <span class="avatar">${esc(state.me.full_name.charAt(0))}</span>
-          <span class="me-t"><b>${esc(state.me.full_name)}</b><small>${state.me.role === 'admin' ? 'مدير' : 'مندوب مبيعات'}</small></span>
-          <button class="icon-btn" data-act="logout" title="تسجيل الخروج" aria-label="تسجيل الخروج">${ic('logout')}</button>
-        </div>
+      <nav class="tabs">${items.map(([k, i, l, n]) => `<button class="tab ${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em class="${k === 'overdue' ? 'bad' : ''}">${n}</em>` : ''}</button>`).join('')}</nav>
+      <div class="nav-tools">
+        <span class="live" id="live" title="تحديث لحظي"><i></i><span>مباشر</span></span>
+        <button class="icon-btn bell ${nOver ? 'has' : ''}" data-act="bell" aria-label="التنبيهات">${ic('bell')}${nOver ? `<em>${nOver}</em>` : ''}</button>
+        <div class="me"><span class="avatar">${esc(state.me.full_name.charAt(0))}</span><span class="me-t"><b>${esc(state.me.full_name)}</b><small>${state.me.role === 'admin' ? 'مدير' : 'مندوب'}</small></span></div>
+        <button class="icon-btn" data-act="logout" title="تسجيل الخروج" aria-label="تسجيل الخروج">${ic('logout')}</button>
       </div>
-    </aside>
-    <div class="main">
-      <header class="topbar">
-        <div class="tb-title">
-          ${state.stack.length ? `<button class="icon-btn back" data-act="back" aria-label="رجوع">${ic('right')}</button>` : ''}
-          <div>
-            ${cr.length > 1 ? '' : '<!--'}<div class="crumbs">${cr.map((p, i) => `<span class="${i === cr.length - 1 ? 'cur-c' : ''}">${esc(p)}</span>`).join(ic('left', 'sep'))}</div>${cr.length > 1 ? '' : '-->'}
-            <h1>${esc(cr[cr.length - 1])}</h1>
-          </div>
-        </div>
-        <div class="tb-tools">
-          <span class="today">${dFmt.format(new Date())}</span>
-          <button class="icon-btn bell ${visibleOverdue().length ? 'has' : ''}" data-act="bell" aria-label="التنبيهات">${ic('bell')}${visibleOverdue().length ? `<em>${visibleOverdue().length}</em>` : ''}</button>
-          <button class="icon-btn m-only" data-act="logout" aria-label="تسجيل الخروج">${ic('logout')}</button>
-        </div>
-        <div class="panel" id="bell-panel" hidden></div>
-      </header>
-      <main class="content">${body}${footer()}</main>
     </div>
-    <nav class="bottom-nav">${items.slice(0, 4).map(([k, i, l, n]) => `<button class="${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em>${n}</em>` : ''}</button>`).join('')}</nav>
-  </div>`;
+    <div class="panel" id="bell-panel" hidden></div>
+  </header>
+  <main class="content">
+    ${state.stack.length ? `<div class="crumbs"><button class="link back" data-act="back">${ic('right')}رجوع</button>${cr.map((p, i) => `<span class="${i === cr.length - 1 ? 'cur-c' : ''}">${esc(p)}</span>`).join(ic('left', 'sep'))}</div>` : ''}
+    ${body}
+    ${footer()}
+  </main>
+  <nav class="bottom-nav">${items.slice(0, 5).map(([k, i, l, n]) => `<button class="${act === k ? 'on' : ''}" data-act="nav" data-k="${k}">${ic(i)}<span>${l}</span>${n ? `<em>${n}</em>` : ''}</button>`).join('')}</nav>`;
   renderLiveDot();
   const s = $('#search'); if (s && state._refocus) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); state._refocus = false; }
+}
+
+/* ---------------- charts (inline SVG, RTL: time runs right to left) ---------------- */
+const fmtK = (n) => (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + 'M' : Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
+function niceMax(v) { if (v <= 0) return 1000; const p = Math.pow(10, Math.floor(Math.log10(v))); const m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+
+function weeklySeries(txs, weeks = 10) {
+  const now = startOfDay(Date.now());
+  const start = now - (weeks * 7 - 1) * DAY;
+  const col = Array(weeks).fill(0), inv = Array(weeks).fill(0);
+  for (const t of txs) {
+    if (t.status !== 'approved') continue;
+    const d = startOfDay(t.occurred_at); if (d < start) continue;
+    const i = Math.min(weeks - 1, Math.floor((d - start) / (7 * DAY)));
+    if (t.kind === 'collection') col[i] += Number(t.amount);
+    else if (t.kind === 'invoice') inv[i] += Number(t.amount);
+  }
+  const labels = col.map((_, i) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'short' }).format(new Date(start + i * 7 * DAY)));
+  return { labels, col, inv };
+}
+
+function lineChart({ labels, series }) {
+  const W = 640, H = 250, padR = 50, padL = 14, padT = 14, padB = 30;
+  const inset = 14, iw = W - padR - padL - inset * 2, ih = H - padT - padB;
+  const max = niceMax(Math.max(...series.flatMap((s) => s.values)));
+  const n = labels.length;
+  const x = (i) => W - padR - inset - (n === 1 ? iw / 2 : (i * iw) / (n - 1));
+  const y = (v) => padT + ih - (v / max) * ih;
+  const ticks = [0, 1, 2, 3, 4].map((k) => (max * k) / 4);
+  let g = ticks.map((t) => `<line class="gl" x1="${padL}" x2="${W - padR}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${W - padR + 10}" y="${y(t) + 4}" text-anchor="start">${fmtK(t)}</text>`).join('');
+  g += labels.map((l, i) => (i % 2 === (n - 1) % 2 ? `<text class="ax" x="${x(i)}" y="${H - 8}" text-anchor="middle">${l}</text>` : '')).join('');
+  series.forEach((s, si) => {
+    const pts = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+    if (si === 0) g += `<polygon class="area s${si}" points="${x(0)},${y(0)} ${pts} ${x(n - 1)},${y(0)}"/>`;
+    g += `<polyline class="ln s${si}" points="${pts}"/>`;
+    g += s.values.map((v, i) => `<circle class="pt s${si}" cx="${x(i)}" cy="${y(v)}" r="4"/>`).join('');
+  });
+  const colW = n > 1 ? iw / (n - 1) : iw;
+  g += labels.map((l, i) => {
+    const tip = `<b>أسبوع ${l}</b>` + series.map((s, si) => `<span><i class="sw s${si}"></i>${s.name}: ${money(s.values[i])}</span>`).join('');
+    return `<rect class="hit" x="${x(i) - colW / 2}" y="${padT}" width="${colW}" height="${ih}" data-tip="${esc(tip)}"><title>${l}</title></rect>`;
+  }).join('');
+  return `<div class="chart"><div class="legend">${series.map((s, si) => `<span><i class="sw s${si}"></i>${s.name}</span>`).join('')}</div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map((s) => s.name).join(' و '))} أسبوعياً">${g}</svg></div>`;
+}
+
+function repBars(sums) {
+  const W = 640, H = 250, padR = 46, padL = 12, padT = 22, padB = 30;
+  const iw = W - padR - padL, ih = H - padT - padB;
+  const max = niceMax(Math.max(1, ...sums.flatMap(({ s }) => [s.total, s.limit])));
+  const y = (v) => padT + ih - (v / max) * ih;
+  const slot = iw / Math.max(1, sums.length), bw = Math.min(56, slot * 0.42);
+  const ticks = [0, 1, 2, 3, 4].map((k) => (max * k) / 4);
+  let g = ticks.map((t) => `<line class="gl" x1="${padL}" x2="${W - padR}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${W - padR + 8}" y="${y(t) + 4}">${fmtK(t)}</text>`).join('');
+  sums.forEach(({ r, s }, i) => {
+    const cx = W - padR - slot * (i + 0.5);
+    const top = y(s.total), h = Math.max(0, padT + ih - top), rr = Math.min(4, h / 2);
+    const cls = s.over ? 'bar bad' : 'bar s1';
+    g += `<path class="${cls}" d="M${cx - bw / 2},${padT + ih} V${top + rr} Q${cx - bw / 2},${top} ${cx - bw / 2 + rr},${top} H${cx + bw / 2 - rr} Q${cx + bw / 2},${top} ${cx + bw / 2},${top + rr} V${padT + ih} Z"/>`;
+    g += `<line class="lim" x1="${cx - bw / 2 - 10}" x2="${cx + bw / 2 + 10}" y1="${y(s.limit)}" y2="${y(s.limit)}"/>`;
+    g += `<text class="val ${s.over ? 'bad' : ''}" x="${cx}" y="${Math.min(top, y(s.limit)) - 7}" text-anchor="middle">${fmtK(s.total)}${s.over ? ' · موقوف' : ''}</text>`;
+    g += `<text class="ax" x="${cx}" y="${H - 8}" text-anchor="middle">${esc(r.full_name.split(' ')[0])}</text>`;
+    const tip = `<b>${esc(r.full_name)}</b><span>المديونية: ${money(s.total)}</span><span>حد الائتمان: ${money(s.limit)}</span><span>${s.over ? 'تجاوز بـ ' + money(s.total - s.limit) : 'متاح ' + money(s.limit - s.total)}</span>`;
+    g += `<rect class="hit" x="${cx - slot / 2}" y="${padT}" width="${slot}" height="${ih}" data-tip="${esc(tip)}" data-act="open-rep" data-id="${r.id}"/>`;
+  });
+  return `<div class="chart"><div class="legend"><span><i class="sw s1"></i>المديونية</span><span><i class="sw lim"></i>حد الائتمان</span><span><i class="sw bad"></i>تجاوز الحد</span></div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="مديونية كل مندوب مقابل حد الائتمان">${g}</svg></div>`;
+}
+
+function showTip(el, ev) {
+  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; document.body.appendChild(t); }
+  t.innerHTML = el.getAttribute('data-tip'); t.hidden = false;
+  const w = t.offsetWidth, h = t.offsetHeight;
+  let lx = ev.clientX - w / 2, ly = ev.clientY - h - 14;
+  lx = Math.max(8, Math.min(window.innerWidth - w - 8, lx)); if (ly < 8) ly = ev.clientY + 18;
+  t.style.left = lx + 'px'; t.style.top = ly + 'px';
+}
+function hideTip() { const t = $('#tip'); if (t) t.hidden = true; }
+document.addEventListener('mousemove', (e) => { const el = e.target.closest?.('[data-tip]'); if (el) showTip(el, e); else hideTip(); });
+document.addEventListener('mouseleave', hideTip);
+
+function greet() {
+  const h = new Date().getHours();
+  return `<div class="hello"><h1>${h < 12 ? 'صباح الخير' : 'مساء الخير'}، ${esc(state.me.full_name.split(' ')[0])}</h1><span class="muted">${new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</span></div>`;
+}
+
+function tiles(list) {
+  return `<div class="tiles">${list.map(([act, icon, label, tone, k, n, dis]) => `<button class="tile t-${tone}" data-act="${act}" ${k ? `data-k="${k}"` : ''} ${dis ? 'disabled' : ''}>${n ? `<em>${n}</em>` : ''}${ic(icon)}<span>${label}</span></button>`).join('')}</div>`;
+}
+
+function globalSearch() {
+  return `<div class="search wide-search">${ic('search')}<input id="gsearch" type="search" placeholder="البحث عن العملاء بالاسم أو التليفون أو المنطقة" autocomplete="off"></div>`;
 }
 
 function footer() {
@@ -495,7 +573,7 @@ function renderLiveDot() {
   const el = $('#live'); if (!el) return;
   const ok = state.liveStatus === 'SUBSCRIBED';
   el.classList.toggle('off', !ok);
-  el.lastElementChild.textContent = ok ? 'متصل · تحديث لحظي' : 'جاري إعادة الاتصال…';
+  el.lastElementChild.textContent = ok ? 'مباشر' : 'جاري إعادة الاتصال…';
 }
 
 function visibleOverdue() {
@@ -570,18 +648,47 @@ function listTools(extra = '') {
 
 function creditCard(sum, title, extra = '') {
   return `<section class="card credit ${sum.over ? 'is-bad' : ''}">
-    ${gauge(sum)}
-    <div class="credit-body">
-      <span class="kpi-l">${title}</span>
-      <div class="big">${money(sum.total)} <span class="cur">ج.م</span></div>
-      <div class="credit-row">
-        <div><span>حد الائتمان</span><b>${money(sum.limit)}</b></div>
-        <div><span>${sum.over ? 'التجاوز' : 'المتاح'}</span><b class="${sum.over ? 't-bad' : 't-ok'}">${money(Math.abs(sum.limit - sum.total))}</b></div>
-        <div><span>قطاعي</span><b>${money(sum.retail)}</b></div>
-        <div><span>جملة</span><b>${money(sum.wholesale)}</b></div>
+    <div class="card-h"><h2>${title}</h2>${sum.over ? '<span class="pill bad"><i></i>موقوف عن الآجل</span>' : `<span class="pill ${levelOf(sum) === 'warn' ? 'warn' : 'ok'}"><i></i>${levelOf(sum) === 'warn' ? 'قريب من الحد' : 'داخل الحد'}</span>`}</div>
+    <div class="credit-b">
+      ${gauge(sum)}
+      <div class="credit-body">
+        <span class="kpi-l">إجمالي المديونية</span>
+        <div class="big">${money(sum.total)} <span class="cur">ج.م</span></div>
+        <div class="credit-row">
+          <div><span>حد الائتمان</span><b>${money(sum.limit)}</b></div>
+          <div><span>${sum.over ? 'التجاوز' : 'المتاح'}</span><b class="${sum.over ? 't-bad' : 't-ok'}">${money(Math.abs(sum.limit - sum.total))}</b></div>
+          <div><span>قطاعي</span><b>${money(sum.retail)}</b></div>
+          <div><span>جملة</span><b>${money(sum.wholesale)}</b></div>
+        </div>
+        ${extra}
       </div>
-      ${extra}
     </div>
+  </section>`;
+}
+
+function trendCard(txs, title) {
+  const w = weeklySeries(txs);
+  const totC = w.col.reduce((a, b) => a + b, 0), totI = w.inv.reduce((a, b) => a + b, 0);
+  return `<section class="card">
+    <div class="card-h"><h2>${title}</h2><span class="muted">آخر 10 أسابيع</span></div>
+    <div class="mini-stats"><div><span>إجمالي التحصيل</span><b class="t-ok">${money(totC)}</b></div><div><span>إجمالي الفواتير الآجل</span><b>${money(totI)}</b></div></div>
+    ${lineChart({ labels: w.labels, series: [{ name: 'التحصيل', values: w.col }, { name: 'فواتير آجل', values: w.inv }] })}
+  </section>`;
+}
+
+function recentCard(limit = 6) {
+  const recent = state.txs.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, limit);
+  return `<section class="card">
+    <div class="card-h"><h2>أحدث التحصيلات</h2></div>
+    ${recent.length ? `<ul class="mini">${recent.map((t) => { const c = state.customers.find((x) => x.id === t.customer_id); return `<li data-act="open-customer" data-id="${t.customer_id}"><span class="av ok">${ic('down')}</span><div><b>${esc(c?.name || '')}</b><small class="sub">${state.me.role === 'admin' ? esc(profileName(t.created_by)) + ' · ' : ''}${fmtDT(t.occurred_at)}</small></div><div class="mini-v"><b class="t-ok">${money(t.amount)}</b></div></li>`; }).join('')}</ul>` : `<div class="empty"><p>لا توجد تحصيلات بعد.</p></div>`}
+  </section>`;
+}
+
+function overdueCard(limit = 6) {
+  const overdue = visibleOverdue();
+  return `<section class="card">
+    <div class="card-h"><h2>أكثر العملاء تأخيراً</h2><button class="btn ghost sm" data-act="nav" data-k="overdue">عرض الكل</button></div>
+    ${overdue.length ? `<ul class="mini">${overdue.slice(0, limit).map((c) => { const s = state.stats.get(c.id); return `<li data-act="open-customer" data-id="${c.id}"><span class="av bad">${esc(initials(c.name))}</span><div><b>${esc(c.name)}</b><small class="sub">${state.me.role === 'admin' ? esc(profileName(c.rep_id)) : esc(c.location || '')}</small></div><div class="mini-v"><b>${money(s.balance)}</b><span class="pill bad"><i></i>${s.overdueDays} يوم تأخير</span></div></li>`; }).join('')}</ul>` : `<div class="empty">${ic('check')}<p>لا يوجد عملاء متأخرين.</p></div>`}
   </section>`;
 }
 
@@ -590,23 +697,21 @@ function viewRepHome() {
   const sum = repSummary(state.me, state.customers, state.stats);
   const overdue = sum.customers.filter((c) => state.stats.get(c.id).overdue).length;
   return `
+  ${greet()}
   ${sum.over ? `<div class="banner bad" role="alert">${ic('lock')}<div><b>تم إيقاف البيع الآجل</b><span>مديونيتك ${money(sum.total)} ج.م تجاوزت حد الائتمان (${money(sum.limit)}) بمبلغ ${money(sum.total - sum.limit)} ج.م. قم بالتحصيل من العملاء لاستئناف العمل.</span></div></div>` : ''}
-  <div class="grid-2">
-    ${creditCard(sum, 'إجمالي المديونية في السوق')}
-    <div class="kpis">
-      ${kpi('down', 'تحصيل الشهر', money(sum.month), monthLabel(monthKey(Date.now())), 'ok')}
-      ${kpi('store', 'عدد العملاء', sum.customers.length, 'عميل نشط')}
-      ${kpi('alert', 'عملاء متأخرين', overdue, `تجاوزوا ${TERM_DAYS} يوم`, overdue ? 'bad' : '')}
-      ${kpi('clock', 'مدة الأجل', TERM_DAYS + ' يوم', 'من تاريخ الفاتورة')}
-    </div>
+  ${tiles([
+    ['collect-pick', 'wallet', 'تسجيل تحصيل', 'green'],
+    ['invoice-pick', 'file', 'فاتورة آجل', 'blue', '', 0, sum.over],
+    ['add-customer', 'userplus', 'عميل جديد', 'purple'],
+    ['scroll-customers', 'store', 'عملائي', 'teal', '', sum.customers.length],
+    ['nav', 'alert', 'المتأخرين', 'red', 'overdue', overdue],
+  ])}
+  <div class="row">
+    ${creditCard(sum, 'حد الائتمان')}
+    ${trendCard(state.txs, 'التحصيل والفواتير')}
   </div>
-  <section class="card">
-    <div class="card-h"><div><h2>عملائي</h2><small class="sub">مرتبين حسب التأخير ثم الرصيد</small></div>
-      <div class="btns">
-        <button class="btn secondary" data-act="invoice-pick" ${sum.over ? 'disabled title="موقوف: تجاوز حد الائتمان"' : ''}>${ic('file')}فاتورة آجل</button>
-        <button class="btn primary" data-act="add-customer">${ic('plus')}إضافة عميل</button>
-      </div>
-    </div>
+  <section class="card" id="my-customers">
+    <div class="card-h"><h2>عملائي</h2><span class="muted">${sum.customers.length} عميل · مرتبين حسب التأخير ثم الرصيد</span></div>
     ${listTools()}
     ${customerTable(sum.customers)}
   </section>`;
@@ -623,7 +728,7 @@ function repCards(sums) {
       <div class="rep-h"><span class="avatar">${esc(r.full_name.charAt(0))}</span><div><b>${esc(r.full_name)}</b><small class="sub" dir="ltr">@${esc(r.username)}</small></div>${s.over ? '<span class="pill bad"><i></i>موقوف</span>' : `<span class="pill ${levelOf(s) === 'warn' ? 'warn' : 'ok'}"><i></i>${levelOf(s) === 'warn' ? 'قريب من الحد' : 'نشط'}</span>`}</div>
       <div class="rep-n">${money(s.total)} <span class="cur">ج.م</span></div>
       ${meter(s)}
-      <div class="rep-f"><span>${ic('store')}${s.customers.length} عميل</span><span>${ic('down')}${money(s.month)}</span>${s.overdue ? `<span class="t-bad">${ic('alert')}${s.overdue} متأخر</span>` : ''}</div>
+      <div class="rep-f"><span>${ic('store')}${s.customers.length} عميل</span><span>${ic('down')}${money(s.month)} هذا الشهر</span>${s.overdue ? `<span class="t-bad">${ic('alert')}${s.overdue} متأخر</span>` : ''}</div>
     </button>`).join('') || `<div class="empty">${ic('users')}<p>لا يوجد مناديب مفعّلين بعد.</p></div>`}
   </div>`;
 }
@@ -635,32 +740,39 @@ function viewAdminHome() {
   const stopped = sums.filter((x) => x.s.over).length;
   const overdue = visibleOverdue();
   const overdueAmt = overdue.reduce((a, c) => a + state.stats.get(c.id).balance, 0);
-  const pendingTx = state.txs.filter((t) => t.status === 'pending');
-  const pendingAcc = reps().filter((r) => !r.active);
-  const recent = state.txs.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, 6);
+  const pendingTx = state.txs.filter((t) => t.status === 'pending').length;
+  const pendingAcc = reps().filter((r) => !r.active).length;
   return `
+  ${greet()}
+  ${globalSearch()}
+  ${tiles([
+    ['nav', 'users', 'المناديب', 'purple', 'reps', 0],
+    ['nav', 'store', 'كل العملاء', 'blue', 'customers', 0],
+    ['nav', 'alert', 'المتأخرين', 'red', 'overdue', overdue.length],
+    ['nav', 'check', 'طلبات التصحيح', 'amber', 'approvals', pendingTx],
+    ['nav', 'userplus', 'حسابات جديدة', 'teal', 'accounts', pendingAcc],
+  ])}
   <div class="kpis four">
     ${kpi('wallet', 'إجمالي الآجل في السوق', money(total), `${sums.length} مندوب نشط`)}
     ${kpi('down', 'تحصيل الشهر', money(month), monthLabel(monthKey(Date.now())), 'ok')}
     ${kpi('lock', 'مناديب تجاوزوا الحد', stopped, stopped ? 'موقوفين عن الآجل' : 'الكل داخل الحد', stopped ? 'bad' : '')}
     ${kpi('alert', 'عملاء متأخرين', overdue.length, `بإجمالي ${money(overdueAmt)} ج.م`, overdue.length ? 'bad' : '')}
   </div>
-  ${pendingTx.length || pendingAcc.length ? `<div class="banner warn">${ic('bell')}<div><b>مطلوب منك مراجعة</b><span>${[pendingTx.length ? `${pendingTx.length} طلب تصحيح` : '', pendingAcc.length ? `${pendingAcc.length} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</span></div>
-    <div class="btns">${pendingTx.length ? '<button class="btn secondary sm" data-act="nav" data-k="approvals">مراجعة الطلبات</button>' : ''}${pendingAcc.length ? '<button class="btn secondary sm" data-act="nav" data-k="accounts">تفعيل الحسابات</button>' : ''}</div></div>` : ''}
-  <section class="card">
-    <div class="card-h"><div><h2>المناديب</h2><small class="sub">اضغط على المندوب لعرض عملائه</small></div><button class="btn ghost sm" data-act="nav" data-k="reps">عرض الكل</button></div>
-    ${repCards(sums)}
-  </section>
-  <div class="grid-2 even">
+  <div class="row">
+    ${trendCard(state.txs, 'التحصيل والفواتير')}
     <section class="card">
-      <div class="card-h"><h2>أكثر العملاء تأخيراً</h2><button class="btn ghost sm" data-act="nav" data-k="overdue">عرض الكل</button></div>
-      ${overdue.length ? `<ul class="mini">${overdue.slice(0, 6).map((c) => { const s = state.stats.get(c.id); return `<li data-act="open-customer" data-id="${c.id}"><span class="av bad">${esc(initials(c.name))}</span><div><b>${esc(c.name)}</b><small class="sub">${esc(profileName(c.rep_id))}</small></div><div class="mini-v"><b>${money(s.balance)}</b><span class="pill bad"><i></i>${s.overdueDays} يوم</span></div></li>`; }).join('')}</ul>` : `<div class="empty">${ic('check')}<p>لا يوجد عملاء متأخرين.</p></div>`}
+      <div class="card-h"><h2>المديونية حسب المندوب</h2><button class="btn ghost sm" data-act="nav" data-k="reps">عرض المناديب</button></div>
+      ${repBars(sums.slice().sort((a, b) => b.s.total - a.s.total))}
     </section>
-    <section class="card">
-      <div class="card-h"><h2>آخر التحصيلات</h2></div>
-      ${recent.length ? `<ul class="mini">${recent.map((t) => { const c = state.customers.find((x) => x.id === t.customer_id); return `<li data-act="open-customer" data-id="${t.customer_id}"><span class="av ok">${ic('down')}</span><div><b>${esc(c?.name || '')}</b><small class="sub">${esc(profileName(t.created_by))} · ${fmtDT(t.occurred_at)}</small></div><div class="mini-v"><b class="t-ok">+${money(t.amount)}</b></div></li>`; }).join('')}</ul>` : `<div class="empty"><p>لا توجد تحصيلات بعد.</p></div>`}
-    </section>
+  </div>
+  <div class="row">
+    ${recentCard()}
+    ${overdueCard()}
   </div>`;
+}
+
+function viewAllCustomers() {
+  return `<section class="card"><div class="card-h"><h2>كل العملاء</h2><span class="muted">${state.customers.length} عميل</span></div>${listTools()}${customerTable(state.customers, { showRep: true, actions: false })}</section>`;
 }
 
 function viewReps() {
@@ -889,6 +1001,14 @@ function amountField(name = 'amount', label = 'المبلغ', extra = '') {
   return `<label>${label}<input id="f-${name}" name="${name}" inputmode="decimal" autocomplete="off" placeholder="0" class="amount" required ${extra}></label>`;
 }
 
+function openCollectPick() {
+  const list = state.customers.filter((c) => state.stats.get(c.id).balance > 0).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  modal('تسجيل تحصيل', `
+    <label>العميل<select id="f-customer" name="customer" required><option value="">اختار العميل</option>${list.map((c) => `<option value="${c.id}">${esc(c.name)} · عليه ${money(state.stats.get(c.id).balance)}</option>`).join('')}</select></label>
+    <button class="btn primary block lg">متابعة</button>`,
+    async (fd) => { const id = fd.get('customer'); if (!id) throw new Error('اختار العميل'); setTimeout(() => openCollect(id), 0); });
+}
+
 function openCollect(cid) {
   const c = state.customers.find((x) => x.id === cid); const s = state.stats.get(cid);
   const form = modal('تحصيل من ' + c.name, `
@@ -1043,6 +1163,8 @@ document.addEventListener('click', async (e) => {
       case 'collect': e.stopPropagation(); openCollect(id); break;
       case 'invoice': openInvoice(id); break;
       case 'invoice-pick': openInvoice(null); break;
+      case 'collect-pick': openCollectPick(); break;
+      case 'scroll-customers': $('#my-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
       case 'add-customer': openAddCustomer(); break;
       case 'correction': openCorrection(id); break;
       case 'type': state.typeFilter = el.dataset.k; render(); break;
@@ -1066,6 +1188,7 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'search') { state.search = e.target.value; state._refocus = true; render(); }
+  if (e.target.id === 'gsearch') { const v = e.target.value; state.view = { name: 'customers' }; state.stack = []; state.search = v; state._refocus = true; render(); }
 });
 document.addEventListener('change', (e) => {
   if (e.target.id === 'month') { state.monthFilter = e.target.value; render(); }
