@@ -24,6 +24,7 @@ function useNav() {
   return [['home', Home, 'الرئيسية', 0], ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger']];
 }
 
+const SHORT = { home: 'الرئيسية', approvals: 'التصحيح', accounts: 'الحسابات' };
 const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة' };
 
 function BellMenu() {
@@ -109,8 +110,8 @@ export function Layout({ children }) {
 
     {/* mobile bottom nav */}
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.slice(0, 5).map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[11px]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
-        <I className="size-5" /><span className="max-w-full truncate">{l}</span>
+      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[11px]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+        <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
         {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[9px] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
       </button>)}
     </nav>

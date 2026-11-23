@@ -137,11 +137,11 @@ function RequestRow({ t }) {
   const act = async (ok) => { try { await api.reviewTransaction(t.id, ok); toast(ok ? 'تمت الموافقة على التصحيح' : 'تم رفض الطلب'); } catch (e) { toast(e.message, 'err'); } };
   return <div className="flex flex-wrap items-center gap-4 rounded-lg border p-4">
     <span className={cn('inline-flex size-10 shrink-0 items-center justify-center rounded-full', t.amount < 0 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning')}><PencilLine className="size-4" /></span>
-    <div className="min-w-0 flex-1 sm:min-w-[220px]">
+    <div className="min-w-0 flex-[1_1_220px]">
       <div className="flex flex-wrap items-center gap-2"><button className="font-semibold hover:underline" onClick={() => go({ name: 'customer', id: t.customer_id })}>{c?.name}</button><span className="text-xs text-muted-foreground">{nameOf(t.created_by)} · {fmtDT(t.created_at)}</span></div>
       <p className="mt-1 text-sm"><span className="font-medium">{t.amount < 0 ? 'تقليل المديونية' : 'زيادة المديونية'} {money(Math.abs(t.amount))} ج.م</span><span className="text-muted-foreground"> · {t.note}</span></p>
     </div>
-    {t.status === 'pending' ? (me.role === 'admin' ? <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => act(false)}><X />رفض</Button><Button size="sm" onClick={() => act(true)}><Check />موافقة</Button></div> : <Badge variant="warning" dot>بانتظار الإدارة</Badge>)
+    {t.status === 'pending' ? (me.role === 'admin' ? <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto"><Button size="sm" variant="outline" className="max-sm:h-10" onClick={() => act(false)}><X />رفض</Button><Button size="sm" className="max-sm:h-10" onClick={() => act(true)}><Check />موافقة</Button></div> : <Badge variant="warning" dot>بانتظار الإدارة</Badge>)
       : <Badge variant={t.status === 'approved' ? 'success' : 'outline'} dot>{t.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</Badge>}
   </div>;
 }
@@ -165,9 +165,9 @@ function ActivateRow({ r }) {
   });
   return <form onSubmit={submit} className="grid gap-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-end gap-4">
-      <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-[200px]"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
-      <Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-48 tnum" /></Field>
-      <Button type="submit" disabled={busy}><Check />تفعيل الحساب</Button>
+      <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
+      <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-full tnum sm:w-48" /></Field></div>
+      <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button>
     </div>
     <FormError>{error}</FormError>
   </form>;
@@ -238,7 +238,7 @@ export function CustomerPage({ id }) {
     <Card className={cn(s.overdue && 'border-danger/40')}>
       <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-5">
         <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
-        <div className="min-w-0 flex-1 sm:min-w-[240px]">
+        <div className="min-w-0 flex-[1_1_240px]">
           <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><Badge variant="outline">{TYPE[c.debt_type]}</Badge><DueBadge s={s} /></div>
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground">
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}

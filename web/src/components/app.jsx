@@ -43,7 +43,7 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
   }, [list, q, type, stats]);
   return <div className="grid gap-4">
     <div className="flex flex-wrap items-center gap-3 px-5">
-      <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
+      <div className="relative min-w-0 flex-[1_1_220px]">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو التليفون أو المنطقة" className="ps-9" type="search" />
       </div>
