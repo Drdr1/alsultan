@@ -24,9 +24,9 @@ export function StatCard({ icon: Icon, label, value, sub, tone = 'default' }) {
   return <Card className={cn('p-4 md:p-5', tone === 'danger' && 'border-danger/30')}>
     <div className="flex items-center justify-between gap-3">
       <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
-      <span className={cn('inline-flex size-10 items-center justify-center rounded-lg', t)}><Icon className="size-[22px]" /></span>
+      <span className={cn('inline-flex size-8 items-center justify-center rounded-lg md:size-10', t)}><Icon className="size-[18px] md:size-[22px]" /></span>
     </div>
-    <div className={cn('tnum mt-3 text-xl font-bold tracking-tight md:text-2xl', tone === 'danger' && 'text-danger')}>{value}</div>
+    <div className={cn('tnum mt-2 text-xl font-bold md:mt-3 tracking-tight md:text-2xl', tone === 'danger' && 'text-danger')}>{value}</div>
     {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
   </Card>;
 }
@@ -43,7 +43,7 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
   }, [list, q, type, stats]);
   return <div className="grid gap-4">
     <div className="flex flex-wrap items-center gap-3 px-5">
-      <div className="relative min-w-[220px] flex-1">
+      <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو التليفون أو المنطقة" className="ps-9" type="search" />
       </div>

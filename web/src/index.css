@@ -60,3 +60,6 @@ body { @apply bg-background text-foreground font-sans antialiased; font-size: 14
 .recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 11px; }
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.grid > * { min-width: 0; }
+html, body { overflow-x: clip; }

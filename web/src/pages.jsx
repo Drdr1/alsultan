@@ -137,7 +137,7 @@ function RequestRow({ t }) {
   const act = async (ok) => { try { await api.reviewTransaction(t.id, ok); toast(ok ? 'تمت الموافقة على التصحيح' : 'تم رفض الطلب'); } catch (e) { toast(e.message, 'err'); } };
   return <div className="flex flex-wrap items-center gap-4 rounded-lg border p-4">
     <span className={cn('inline-flex size-10 shrink-0 items-center justify-center rounded-full', t.amount < 0 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning')}><PencilLine className="size-4" /></span>
-    <div className="min-w-[220px] flex-1">
+    <div className="min-w-0 flex-1 sm:min-w-[220px]">
       <div className="flex flex-wrap items-center gap-2"><button className="font-semibold hover:underline" onClick={() => go({ name: 'customer', id: t.customer_id })}>{c?.name}</button><span className="text-xs text-muted-foreground">{nameOf(t.created_by)} · {fmtDT(t.created_at)}</span></div>
       <p className="mt-1 text-sm"><span className="font-medium">{t.amount < 0 ? 'تقليل المديونية' : 'زيادة المديونية'} {money(Math.abs(t.amount))} ج.م</span><span className="text-muted-foreground"> · {t.note}</span></p>
     </div>
@@ -165,7 +165,7 @@ function ActivateRow({ r }) {
   });
   return <form onSubmit={submit} className="grid gap-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-end gap-4">
-      <div className="flex min-w-[200px] flex-1 items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-[200px]"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
       <Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-48 tnum" /></Field>
       <Button type="submit" disabled={busy}><Check />تفعيل الحساب</Button>
     </div>
@@ -236,10 +236,10 @@ export function CustomerPage({ id }) {
   const pending = s.list.filter((t) => t.status === 'pending');
   return <>
     <Card className={cn(s.overdue && 'border-danger/40')}>
-      <div className="flex flex-wrap items-center gap-4 p-5">
-        <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" />
-        <div className="min-w-[240px] flex-1">
-          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-xl font-bold', s.overdue && 'text-danger')}>{c.name}</h2><Badge variant="outline">{TYPE[c.debt_type]}</Badge><DueBadge s={s} /></div>
+      <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-5">
+        <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
+        <div className="min-w-0 flex-1 sm:min-w-[240px]">
+          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><Badge variant="outline">{TYPE[c.debt_type]}</Badge><DueBadge s={s} /></div>
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground">
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}
             {c.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{c.location}</span>}
@@ -247,7 +247,7 @@ export function CustomerPage({ id }) {
             <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />عميل منذ {fmtDate(c.created_at)}</span>
           </div>
         </div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+        <div className="grid w-full auto-cols-fr grid-flow-col gap-2 sm:flex sm:w-auto [&>button]:max-sm:px-2">
           {isRep ? <>
             <Button variant="outline" onClick={() => open({ type: 'correction', id })}><PencilLine />طلب تصحيح</Button>
             <Button variant="outline" disabled={repSum.over} onClick={() => open({ type: 'invoice', id })}><FileText />فاتورة آجل</Button>
@@ -255,19 +255,31 @@ export function CustomerPage({ id }) {
           </> : <Button variant="outline" onClick={() => open({ type: 'correction', id })}><PencilLine />تصحيح الرصيد</Button>}
         </div>
       </div>
-      <div className="grid grid-cols-2 border-t md:grid-cols-4 [&>div]:p-5 [&>div:not(:first-child)]:md:border-s [&>div:nth-child(2)]:border-s [&>div:nth-child(n+3)]:max-md:border-t [&>div:nth-child(4)]:max-md:border-s">
-        <div className={s.overdue ? 'bg-danger-soft/60' : ''}><div className="text-xs text-muted-foreground">الرصيد المستحق</div><div className={cn('tnum mt-1 text-2xl font-bold', s.overdue && 'text-danger')}>{money(s.balance)}</div></div>
-        <div><div className="text-xs text-muted-foreground">تحصيل الشهر</div><div className="tnum mt-1 text-2xl font-bold text-success">{money(s.monthCollected)}</div></div>
-        <div><div className="text-xs text-muted-foreground">{s.overdue ? 'مدة التأخير' : 'آخر يوم في الأجل'}</div><div className={cn('mt-1 text-lg font-semibold', s.overdue && 'text-danger')}>{s.balance > 0 ? (s.overdue ? `${s.overdueDays} يوم` : fmtDate(s.dueDate)) : '—'}</div></div>
-        <div><div className="text-xs text-muted-foreground">آخر تحصيل</div><div className="mt-1 text-lg font-semibold">{s.lastCollection ? fmtDate(s.lastCollection) : '—'}</div></div>
+      <div className="grid grid-cols-2 border-t md:grid-cols-4 [&>div]:px-4 [&>div]:py-3 sm:[&>div]:p-5 [&>div:not(:first-child)]:md:border-s [&>div:nth-child(2)]:border-s [&>div:nth-child(n+3)]:max-md:border-t [&>div:nth-child(4)]:max-md:border-s">
+        <div className={s.overdue ? 'bg-danger-soft/60' : ''}><div className="text-xs text-muted-foreground">الرصيد المستحق</div><div className={cn('tnum mt-1 text-xl font-bold sm:text-2xl', s.overdue && 'text-danger')}>{money(s.balance)}</div></div>
+        <div><div className="text-xs text-muted-foreground">تحصيل الشهر</div><div className="tnum mt-1 text-xl font-bold text-success sm:text-2xl">{money(s.monthCollected)}</div></div>
+        <div><div className="text-xs text-muted-foreground">{s.overdue ? 'مدة التأخير' : 'آخر يوم في الأجل'}</div><div className={cn('mt-1 text-base font-semibold sm:text-lg', s.overdue && 'text-danger')}>{s.balance > 0 ? (s.overdue ? `${s.overdueDays} يوم` : fmtDate(s.dueDate)) : '—'}</div></div>
+        <div><div className="text-xs text-muted-foreground">آخر تحصيل</div><div className="mt-1 text-base font-semibold sm:text-lg">{s.lastCollection ? fmtDate(s.lastCollection) : '—'}</div></div>
       </div>
     </Card>
     {pending.length > 0 && <Card><CardHeader><CardTitle>طلبات تصحيح معلقة</CardTitle></CardHeader><CardContent className="grid gap-3">{pending.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
-    <div className="grid items-start gap-6 xl:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
         <CardHeader><div><CardTitle>كشف الحساب</CardTitle><CardDescription>{shown.length} حركة · كل حركة بتاريخها ومن سجّلها</CardDescription></div>
-          <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-44"><option value="all">كل الفترات</option>{months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</Select></CardHeader>
-        <div className="border-t">
+          <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full sm:w-44"><option value="all">كل الفترات</option>{months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</Select></CardHeader>
+        <ul className="divide-y border-t md:hidden">{shown.map(({ t, run }) => { const e = t.kind === 'collection' ? -t.amount : Number(t.amount); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
+          <li key={t.id} className={cn('flex items-center gap-3 px-4 py-3', off && 'opacity-60')}>
+            <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-full', KIND_TONE[t.kind])}><I className="size-4" /></span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">{KIND[t.kind]}{t.status === 'pending' && <Badge variant="warning">معلق</Badge>}{t.status === 'rejected' && <Badge variant="outline">مرفوض</Badge>}</div>
+              <div className="truncate text-xs text-muted-foreground">{fmtDT(t.occurred_at)}{t.note && t.note !== 'رصيد افتتاحي' ? ' · ' + t.note : ''}</div>
+            </div>
+            <div className="shrink-0 text-end">
+              <div dir="ltr" className={cn('tnum text-sm font-semibold', e < 0 ? 'text-success' : '', off && 'line-through')}>{e < 0 ? '−' : '+'}{money(Math.abs(e))}</div>
+              <div className="tnum text-[11px] text-muted-foreground">الرصيد {off ? '—' : money(run)}</div>
+            </div>
+          </li>); })}</ul>
+        <div className="border-t max-md:hidden">
           <Table>
             <THead><TR className="bg-muted/40"><TH>التاريخ</TH><TH>البيان</TH><TH className="text-end">مدين</TH><TH className="text-end">دائن</TH><TH className="text-end">الرصيد</TH><TH className="max-md:hidden">بواسطة</TH></TR></THead>
             <TBody>{shown.map(({ t, run }) => { const e = t.kind === 'collection' ? -t.amount : Number(t.amount); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (

@@ -98,7 +98,7 @@ export function Layout({ children }) {
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
-      <main className="mx-auto grid w-full max-w-[1280px] gap-6 px-4 pb-28 pt-6 md:px-8 lg:pb-10">
+      <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1280px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
         {children}
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
           {api?.mode === 'demo' ? <><span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-warning" />نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button className="font-medium text-foreground hover:underline" onClick={() => api.resetDemo()}>استرجاع البيانات التجريبية</button></>
