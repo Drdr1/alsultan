@@ -74,9 +74,9 @@ export function AdminHome() {
       </form>
     </Greeting>
     {(pendTx > 0 || pendAcc > 0) && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4">
-      <BellRing className="size-5 text-warning" />
-      <div className="min-w-0 flex-1 text-sm"><span className="font-semibold">مطلوب مراجعتك: </span>{[pendTx ? `${pendTx} طلب تصحيح` : '', pendAcc ? `${pendAcc} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</div>
-      <div className="flex gap-2">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
+      <BellRing className="size-5 shrink-0 text-warning" />
+      <div className="min-w-0 flex-[1_1_220px] text-sm"><span className="font-semibold">مطلوب مراجعتك: </span>{[pendTx ? `${pendTx} طلب تصحيح` : '', pendAcc ? `${pendAcc} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</div>
+      <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:h-10 [&>button]:max-sm:flex-1">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
     </div>}
     <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
       <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={`${sums.length} مندوب نشط`} tone="brand" />
