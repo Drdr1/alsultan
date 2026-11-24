@@ -115,7 +115,7 @@ export function CreditCard({ sum, title = 'حد الائتمان', children }) {
   </Card>;
 }
 
-const fmtK = (n) => (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
+const fmtK = (n) => (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + ' مليون' : Math.abs(n) >= 1000 ? Math.round(n / 1000) + ' ألف' : String(Math.round(n)));
 const dm = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'short' });
 
 function ChartTip({ active, payload, label }) {
@@ -154,7 +154,7 @@ export function TrendCard({ txs, weeks = 10 }) {
           <defs><linearGradient id="gcol" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.22} /><stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} /></linearGradient></defs>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" reversed tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(l) => l.replace('أسبوع ', '')} interval="preserveStartEnd" minTickGap={16} />
-          <YAxis orientation="right" tickLine={false} axisLine={false} tickFormatter={fmtK} width={44} />
+          <YAxis orientation="right" tickLine={false} axisLine={false} tickFormatter={fmtK} width={78} tick={{ textAnchor: "end" }} />
           <Tooltip content={<ChartTip />} cursor={{ stroke: 'hsl(var(--border))' }} />
           <Area type="monotone" dataKey="col" name="التحصيل" stroke="var(--chart-1)" strokeWidth={2} fill="url(#gcol)" dot={false} activeDot={{ r: 5 }} animationDuration={500} />
           <Area type="monotone" dataKey="inv" name="فواتير آجل" stroke="var(--chart-2)" strokeWidth={2} fill="transparent" dot={false} activeDot={{ r: 5 }} animationDuration={500} />
@@ -174,7 +174,7 @@ export function RepBarsCard({ sums, onOpen }) {
         <BarChart data={rows} margin={{ top: 8, right: 4, left: 4, bottom: 0 }} barGap={4}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="name" reversed tickLine={false} axisLine={false} tickMargin={8} />
-          <YAxis orientation="right" tickLine={false} axisLine={false} tickFormatter={fmtK} width={44} />
+          <YAxis orientation="right" tickLine={false} axisLine={false} tickFormatter={fmtK} width={78} tick={{ textAnchor: "end" }} />
           <Tooltip content={<ChartTip />} cursor={{ fill: 'hsl(var(--muted))' }} />
           <Bar dataKey="total" name="المديونية" fill="var(--chart-2)" radius={[4, 4, 0, 0]} maxBarSize={44} onClick={(d) => onOpen?.(d.id)} className="cursor-pointer">
             {rows.map((r) => <Cell key={r.id} fill={r.over ? 'hsl(var(--danger))' : 'var(--chart-2)'} />)}
