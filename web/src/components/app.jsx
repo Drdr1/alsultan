@@ -23,7 +23,7 @@ export function StatCard({ icon: Icon, label, value, sub, tone = 'default' }) {
   const t = { default: 'bg-muted text-foreground', success: 'bg-success-soft text-success', danger: 'bg-danger-soft text-danger', brand: 'bg-brand-soft text-brand', warning: 'bg-warning-soft text-warning' }[tone];
   return <Card className={cn('p-4 md:p-5', tone === 'danger' && 'border-danger/30')}>
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
+      <span className="text-[14px] font-medium text-muted-foreground">{label}</span>
       <span className={cn('inline-flex size-8 items-center justify-center rounded-lg md:size-10', t)}><Icon className="size-[18px] md:size-[22px]" /></span>
     </div>
     <div className={cn('tnum mt-2 text-xl font-bold md:mt-3 tracking-tight md:text-2xl', tone === 'danger' && 'text-danger')}>{value}</div>
@@ -97,12 +97,12 @@ export function CreditCard({ sum, title = 'حد الائتمان', children }) {
       <div className="flex items-center gap-6">
         <div className="relative size-28 shrink-0">
           <svg viewBox="0 0 110 110" className="size-full -rotate-90"><circle cx="55" cy="55" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" /><circle cx="55" cy="55" r={r} fill="none" stroke={stroke} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${C * p} ${C}`} /></svg>
-          <div className="absolute inset-0 grid place-content-center text-center"><span className={cn('tnum text-xl font-bold', sum.over && 'text-danger')}>{pct}%</span><span className="text-[11px] text-muted-foreground">من الحد</span></div>
+          <div className="absolute inset-0 grid place-content-center text-center"><span className={cn('tnum text-xl font-bold', sum.over && 'text-danger')}>{pct}%</span><span className="text-[12px] text-muted-foreground">من الحد</span></div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-muted-foreground">إجمالي المديونية</div>
+          <div className="text-[14px] text-muted-foreground">إجمالي المديونية</div>
           <div className={cn('tnum text-3xl font-bold tracking-tight', sum.over && 'text-danger')}>{money(sum.total)}<span className="ms-1 text-sm font-normal text-muted-foreground">ج.م</span></div>
-          <div className="mt-1 text-[13px] text-muted-foreground">من حد <span className="tnum font-medium text-foreground">{money(sum.limit)}</span></div>
+          <div className="mt-1 text-[14px] text-muted-foreground">من حد <span className="tnum font-medium text-foreground">{money(sum.limit)}</span></div>
         </div>
       </div>
       <div className="mt-5 grid grid-cols-3 divide-x divide-x-reverse rounded-md border bg-muted/30 text-center">

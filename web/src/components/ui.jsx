@@ -15,7 +15,7 @@ const BTN = {
   danger: 'bg-danger text-white hover:bg-danger/90',
   'danger-outline': 'border border-danger/30 text-danger hover:bg-danger-soft bg-card',
 };
-const SIZE = { default: 'h-9 px-4 text-sm', sm: 'h-8 px-3 text-[13px]', lg: 'h-11 px-5 text-[15px]', icon: 'h-9 w-9' };
+const SIZE = { default: 'h-9 px-4 text-sm', sm: 'h-8 px-3 text-[14px]', lg: 'h-11 px-5 text-[15px]', icon: 'h-9 w-9' };
 export function Button({ variant = 'default', size = 'default', className, ...p }) {
   return <button className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-[18px] [&_svg]:shrink-0', BTN[variant], SIZE[size], className)} {...p} />;
 }
@@ -24,7 +24,7 @@ export function Button({ variant = 'default', size = 'default', className, ...p 
 export const Card = ({ className, ...p }) => <div className={cn('rounded-lg border bg-card shadow-card', className)} {...p} />;
 export const CardHeader = ({ className, ...p }) => <div className={cn('flex flex-wrap items-start justify-between gap-3 p-5 pb-3', className)} {...p} />;
 export const CardTitle = ({ className, ...p }) => <h3 className={cn('text-[15px] font-semibold leading-tight', className)} {...p} />;
-export const CardDescription = ({ className, ...p }) => <p className={cn('mt-1 text-[13px] text-muted-foreground', className)} {...p} />;
+export const CardDescription = ({ className, ...p }) => <p className={cn('mt-1 text-[14px] text-muted-foreground', className)} {...p} />;
 export const CardContent = ({ className, ...p }) => <div className={cn('p-5 pt-0', className)} {...p} />;
 
 /* ---------- Badge ---------- */
@@ -47,14 +47,14 @@ export function Badge({ variant = 'default', dot, className, children }) {
 export const Input = ({ className, ...p }) => <input className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring disabled:opacity-50', className)} {...p} />;
 export const Textarea = ({ className, ...p }) => <textarea className={cn('flex min-h-[72px] w-full rounded-md border bg-card px-3 py-2 text-sm shadow-card placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring', className)} {...p} />;
 export const Select = ({ className, ...p }) => <select className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30', className)} {...p} />;
-export const Label = ({ className, ...p }) => <label className={cn('grid gap-1.5 text-[13px] font-medium', className)} {...p} />;
+export const Label = ({ className, ...p }) => <label className={cn('grid gap-1.5 text-[14px] font-medium', className)} {...p} />;
 export const Field = ({ label, hint, children }) => <Label>{label}{children}{hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}</Label>;
 
 /* ---------- Segmented tabs ---------- */
 export function Segmented({ value, onChange, options, className }) {
   return <div className={cn('inline-flex h-9 items-center rounded-md bg-muted p-1 text-muted-foreground', className)} role="tablist">
     {options.map(([k, l]) => <button key={k} role="tab" aria-selected={value === k} onClick={() => onChange(k)}
-      className={cn('inline-flex h-7 items-center rounded-sm px-3 text-[13px] font-medium transition-all', value === k ? 'bg-card text-foreground shadow-card' : 'hover:text-foreground')}>{l}</button>)}
+      className={cn('inline-flex h-7 items-center rounded-sm px-3 text-[14px] font-medium transition-all', value === k ? 'bg-card text-foreground shadow-card' : 'hover:text-foreground')}>{l}</button>)}
   </div>;
 }
 
@@ -84,7 +84,7 @@ export function Empty({ icon: Icon, title, children }) {
   return <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
     {Icon && <span className="mb-1 inline-flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon className="size-5" /></span>}
     <p className="text-sm font-medium">{title}</p>
-    {children && <p className="max-w-sm text-[13px] text-muted-foreground">{children}</p>}
+    {children && <p className="max-w-sm text-[14px] text-muted-foreground">{children}</p>}
   </div>;
 }
 
@@ -101,7 +101,7 @@ export function Dialog({ open, onClose, title, description, children, width = 'm
   if (!open) return null;
   return createPortal(<div dir="rtl" className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 animate-fade" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
     <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={cn('relative grid max-h-full w-full gap-5 overflow-auto rounded-lg border bg-card p-6 shadow-pop animate-in', width)}>
-      <div className="pe-8"><h2 className="text-lg font-semibold leading-tight">{title}</h2>{description && <p className="mt-1.5 text-[13px] text-muted-foreground">{description}</p>}</div>
+      <div className="pe-8"><h2 className="text-lg font-semibold leading-tight">{title}</h2>{description && <p className="mt-1.5 text-[14px] text-muted-foreground">{description}</p>}</div>
       <button onClick={onClose} aria-label="إغلاق" className="absolute end-4 top-4 rounded-sm p-1 text-muted-foreground opacity-70 hover:opacity-100"><X className="size-4" /></button>
       {children}
     </div>
@@ -137,4 +137,4 @@ export function useSubmit(fn, onDone) {
   };
   return { busy, error, submit, setError };
 }
-export const FormError = ({ children }) => children ? <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2.5 text-[13px] text-danger"><AlertCircle className="mt-0.5 size-4 shrink-0" />{children}</div> : null;
+export const FormError = ({ children }) => children ? <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2.5 text-[14px] text-danger"><AlertCircle className="mt-0.5 size-4 shrink-0" />{children}</div> : null;

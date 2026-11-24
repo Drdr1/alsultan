@@ -37,14 +37,6 @@
   --chart-grid: #ECECEF;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: 240 10% 4%; --foreground: 0 0% 98%; --card: 240 8% 6%; --muted: 240 4% 14%; --muted-foreground: 240 5% 65%;
-    --border: 240 4% 17%; --primary: 0 0% 98%; --primary-foreground: 240 6% 10%; --brand: 217 91% 64%; --brand-soft: 222 47% 14%;
-    --success: 152 55% 50%; --success-soft: 155 40% 11%; --danger: 0 84% 66%; --danger-soft: 0 45% 12%; --warning: 38 92% 58%; --warning-soft: 35 50% 11%;
-    --sidebar: 240 8% 5%; --chart-1: #2FA472; --chart-2: #5B8FE6; --chart-grid: #26262B; color-scheme: dark;
-  }
-}
 :root[data-theme="dark"] {
   --background: 240 10% 4%; --foreground: 0 0% 98%; --card: 240 8% 6%; --muted: 240 4% 14%; --muted-foreground: 240 5% 65%;
   --border: 240 4% 17%; --primary: 0 0% 98%; --primary-foreground: 240 6% 10%; --brand: 217 91% 64%; --brand-soft: 222 47% 14%;
@@ -53,11 +45,11 @@
 }
 
 html, body, #root { height: 100%; }
-body { @apply bg-background text-foreground font-sans antialiased; font-size: 14px; direction: rtl; }
+body { @apply bg-background text-foreground font-sans antialiased; font-size: 15px; direction: rtl; }
 * { @apply border-border; }
 .tnum { font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 11px; }
+.recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 13px; }
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 

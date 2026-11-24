@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Storefront } from '@phosphor-icons/react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive } from './icons.jsx';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun } from './icons.jsx';
 import { TERM_DAYS, money } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, cn } from './ui.jsx';
@@ -9,6 +9,16 @@ export function Logo({ className }) {
   return <span className={cn('inline-flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground', className)} aria-hidden="true">
     <Storefront weight="fill" className="size-5" />
   </span>;
+}
+
+export function ThemeToggle({ className }) {
+  const [dark, setDark] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark');
+  const flip = () => {
+    const next = !dark; setDark(next);
+    if (next) document.documentElement.setAttribute('data-theme', 'dark'); else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('alsultan-theme', next ? 'dark' : 'light'); } catch (e) { /* storage blocked */ }
+  };
+  return <Button variant="outline" size="icon" className={className} onClick={flip} aria-label={dark ? 'الوضع الفاتح' : 'الوضع الليلي'} title={dark ? 'الوضع الفاتح' : 'الوضع الليلي'}>{dark ? <Sun /> : <Moon />}</Button>;
 }
 
 function useNav() {
@@ -34,7 +44,7 @@ function BellMenu() {
   useEffect(() => { const h = (e) => !ref.current?.contains(e.target) && setOpen(false); document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
   return <div className="relative" ref={ref}>
     <Button variant="outline" size="icon" aria-label="التنبيهات" onClick={() => setOpen((o) => !o)} className="relative">
-      <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
+      <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[12px] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
     </Button>
     {open && <div className="absolute end-0 top-11 z-40 w-[min(360px,calc(100vw-24px))] rounded-lg border bg-card shadow-pop animate-in">
       <div className="flex items-center justify-between border-b px-4 py-3">
@@ -89,13 +99,14 @@ export function Layout({ children }) {
     </aside>
 
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-8">
-        <div className="lg:hidden"><Logo className="size-8" /></div>
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-2 sm:gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-8">
+        {!stack.length && <div className="lg:hidden"><Logo className="size-8" /></div>}
         {stack.length > 0 && <Button variant="outline" size="icon" onClick={back} aria-label="رجوع"><ArrowRight /></Button>}
         <div className="min-w-0 flex-1">
           {trail.length > 1 && <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">{trail.slice(0, -1).map((t, i) => <span key={i} className="inline-flex items-center gap-1">{t}<ChevronLeft className="size-3" /></span>)}</div>}
           <h1 className="truncate text-lg font-semibold leading-tight">{title}</h1>
         </div>
+        <ThemeToggle />
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
@@ -110,9 +121,9 @@ export function Layout({ children }) {
 
     {/* mobile bottom nav */}
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[11px]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[12px]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
         <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
-        {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[9px] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
+        {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
       </button>)}
     </nav>
   </div>;

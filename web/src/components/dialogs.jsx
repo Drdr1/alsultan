@@ -21,7 +21,7 @@ export function DialogsProvider({ children }) {
 
 function Context({ label, value, tone }) {
   return <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-3">
-    <span className="text-[13px] text-muted-foreground">{label}</span>
+    <span className="text-[14px] text-muted-foreground">{label}</span>
     <span className={cn('tnum text-lg font-semibold', tone)}>{money(value)} <span className="text-xs font-normal text-muted-foreground">ج.م</span></span>
   </div>;
 }
@@ -57,7 +57,7 @@ function CollectDialog({ id, onClose }) {
       {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
       {s && <Context label="الرصيد الحالي" value={s.balance} />}
       <Field label="المبلغ المستلم"><AmountInput value={amt} onChange={(e) => setAmt(e.target.value)} /></Field>
-      {s && <p className="text-center text-[13px] text-muted-foreground">الرصيد بعد التحصيل: <span className={cn('tnum font-semibold text-foreground', left < 0 && 'text-danger')}>{money(left)}</span></p>}
+      {s && <p className="text-center text-[14px] text-muted-foreground">الرصيد بعد التحصيل: <span className={cn('tnum font-semibold text-foreground', left < 0 && 'text-danger')}>{money(left)}</span></p>}
       <Field label="ملاحظة (اختياري)"><Input name="note" placeholder="كاش / شيك رقم …" /></Field>
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" variant="success" className="flex-1" size="lg" disabled={busy}>تسجيل التحصيل</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
@@ -85,7 +85,7 @@ function InvoiceDialog({ id, onClose }) {
       <Context label="المتاح قبل الحد" value={Math.max(0, sum.limit - sum.total)} tone="text-success" />
       <Field label="قيمة الفاتورة"><AmountInput /></Field>
       <Field label="رقم الفاتورة / ملاحظة"><Input name="note" placeholder="مثلاً: فاتورة 1543" /></Field>
-      <div className="flex items-center gap-2 rounded-md bg-brand-soft px-3 py-2.5 text-[13px] text-brand"><CalendarClock className="size-4" />آخر يوم للأجل: {fmtDate(Date.now() + (TERM_DAYS - 1) * DAY)}</div>
+      <div className="flex items-center gap-2 rounded-md bg-brand-soft px-3 py-2.5 text-[14px] text-brand"><CalendarClock className="size-4" />آخر يوم للأجل: {fmtDate(Date.now() + (TERM_DAYS - 1) * DAY)}</div>
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>تسجيل الفاتورة</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
@@ -117,7 +117,7 @@ function AddCustomerDialog({ onClose }) {
         <Field label="الرصيد الحالي (عليه كام)"><Input name="opening" inputMode="decimal" placeholder="0" className="tnum" /></Field>
         <Field label="تاريخ أقدم فاتورة مفتوحة"><Input name="opening_date" type="date" defaultValue={today} min={minD} max={today} /></Field>
       </div>
-      {dup && <p className="rounded-md bg-warning-soft px-3 py-2 text-[13px] text-warning">تنبيه: فيه عميل مسجل باسم "{dup.name}"{dup.phone ? ` (${dup.phone})` : ''}</p>}
+      {dup && <p className="rounded-md bg-warning-soft px-3 py-2 text-[14px] text-warning">تنبيه: فيه عميل مسجل باسم "{dup.name}"{dup.phone ? ` (${dup.phone})` : ''}</p>}
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>حفظ العميل</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>

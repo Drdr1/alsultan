@@ -3,7 +3,7 @@ import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, U
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs } from './components/dialogs.jsx';
-import { Logo } from './components/layout.jsx';
+import { Logo, ThemeToggle } from './components/layout.jsx';
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
 import { CustomerTable, CreditCard, TrendCard, RepBarsCard, RepCard, StatCard, DueBadge, initials } from './components/app.jsx';
 
@@ -240,7 +240,7 @@ export function CustomerPage({ id }) {
         <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
         <div className="min-w-0 flex-[1_1_240px]">
           <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><Badge variant="outline">{TYPE[c.debt_type]}</Badge><DueBadge s={s} /></div>
-          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground">
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted-foreground">
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}
             {c.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{c.location}</span>}
             {!isRep && <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" />{nameOf(c.rep_id)}</span>}
@@ -276,7 +276,7 @@ export function CustomerPage({ id }) {
             </div>
             <div className="shrink-0 text-end">
               <div dir="ltr" className={cn('tnum text-sm font-semibold', e < 0 ? 'text-success' : '', off && 'line-through')}>{e < 0 ? '−' : '+'}{money(Math.abs(e))}</div>
-              <div className="tnum text-[11px] text-muted-foreground">الرصيد {off ? '—' : money(run)}</div>
+              <div className="tnum text-[12px] text-muted-foreground">الرصيد {off ? '—' : money(run)}</div>
             </div>
           </li>); })}</ul>
         <div className="border-t max-md:hidden">
@@ -299,8 +299,8 @@ export function CustomerPage({ id }) {
         <CardHeader><div><CardTitle>الأرشيف الشهري</CardTitle><CardDescription>محفوظ دائماً ولا يُحذف</CardDescription></div></CardHeader>
         <CardContent className="grid gap-1">{byMonth.map((m) => <button key={m.k} onClick={() => setMonth(m.k === month ? 'all' : m.k)} className={cn('grid grid-cols-[1fr_auto_auto] items-center gap-4 rounded-md px-3 py-2.5 text-start text-sm', month === m.k ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted/60')}>
           <span className="font-medium">{monthLabel(m.k)}</span>
-          <span className="text-end"><span className="block text-[10px] text-muted-foreground">مدين</span><span className="tnum">{money(m.debit)}</span></span>
-          <span className="text-end"><span className="block text-[10px] text-muted-foreground">محصّل</span><span className="tnum text-success">{money(m.credit)}</span></span>
+          <span className="text-end"><span className="block text-[12px] text-muted-foreground">مدين</span><span className="tnum">{money(m.debit)}</span></span>
+          <span className="text-end"><span className="block text-[12px] text-muted-foreground">محصّل</span><span className="tnum text-success">{money(m.credit)}</span></span>
         </button>)}</CardContent>
       </Card>
     </div>
@@ -309,7 +309,8 @@ export function CustomerPage({ id }) {
 
 /* ================= auth ================= */
 function AuthShell({ children }) {
-  return <div className="grid min-h-full lg:grid-cols-2">
+  return <div className="relative grid min-h-full lg:grid-cols-2">
+    <ThemeToggle className="absolute end-4 top-4 z-10 lg:end-auto lg:start-4" />
     <div className="flex items-center justify-center px-5 py-12">
       <div className="grid w-full max-w-sm gap-7">{children}</div>
     </div>
@@ -335,7 +336,7 @@ export function LoginPage() {
   return <AuthShell>
     <div className="flex items-center gap-3 lg:hidden"><Logo /><span className="font-bold">السلطان للتوزيع</span></div>
     <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
-    {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[13px] text-success">{done}</div>}
+    {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[14px] text-success">{done}</div>}
     {tab === 'login' ? <form onSubmit={login.submit} className="grid gap-4">
       <Field label="اسم المستخدم"><Input name="username" autoComplete="username" dir="ltr" required /></Field>
       <Field label="كلمة المرور"><Input name="password" type="password" autoComplete="current-password" dir="ltr" required /></Field>
@@ -353,7 +354,7 @@ export function LoginPage() {
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
         {[['sayed', 'سيد', 'مدير'], ['mohamed', 'محمد', 'مدير'], ['ahmed', 'أحمد', 'حد 1,000,000'], ['mahmoud', 'محمود', 'حد 500,000'], ['karim', 'كريم', 'حد 200,000 · موقوف']].map(([u, n, l]) =>
-          <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[11px] text-muted-foreground">{l}</span></span></button>)}
+          <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[12px] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
   </AuthShell>;
