@@ -113,10 +113,11 @@ export function AdminHome() {
 }
 
 function AgenciesCard() {
-  const { api, raw, agencies, agency, setAgency, toast } = useApp();
+  const { api, raw, agencies, agency, setAgency, toast, scope } = useApp();
   const [adding, setAdding] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => { const a = await api.addAgency(fd.get('name')); toast(`تمت إضافة توكيل ${a.name}`); setAdding(false); });
   const count = (id) => raw.profiles.filter((p) => p.role === 'rep' && p.active && p.agency_id === id).length;
+  if (scope) return null; // agency managers only ever see their own agency
   return <Card>
     <CardHeader><div><CardTitle>التوكيلات</CardTitle><CardDescription>كل مندوب تبع توكيل واحد، وكل توكيل أرقامه لوحده. اختار التوكيل اللي عايز تشوفه.</CardDescription></div>
       {!adding && <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Store />توكيل جديد</Button>}</CardHeader>
@@ -389,7 +390,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'مدير'], ['mohamed', 'محمد', 'مدير'], ['ahmed', 'أحمد', 'حد 1,000,000'], ['mahmoud', 'محمود', 'حد 500,000'], ['karim', 'كريم', 'حد 200,000 · موقوف']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير تايجر'], ['younis', 'محمد يونس', 'مدير تايجر'], ['aref', 'أحمد عارف', 'مدير تايجر'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}

@@ -49,7 +49,7 @@ function NotifyPrompt() {
 
 function AgencyPicker({ className }) {
   const { me, agencies, agency, setAgency } = useApp();
-  if (me.role !== 'admin' || agencies.length === 0) return null;
+  if (me.role !== 'admin' || agencies.length < 2) return null;
   return <Select aria-label="التوكيل" value={agency} onChange={(e) => setAgency(e.target.value)} className={cn('font-medium border-foreground/40', className)}>
     {agencies.map((a) => <option key={a.id} value={a.id}>توكيل {a.name}</option>)}
   </Select>;
@@ -72,13 +72,15 @@ const SHORT = { home: 'الرئيسية', approvals: 'التصحيح', accounts:
 const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة' };
 
 function BellMenu() {
-  const { overdue, go, me, nameOf, stats } = useApp();
+  const { overdue, go, me, nameOf, stats, overLimit, agency } = useApp();
+  const reps = overLimit.filter(({ r }) => me.role !== 'admin' || agency === 'all' || r.agency_id === agency);
+  const count = overdue.length + reps.length;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => { const h = (e) => !ref.current?.contains(e.target) && setOpen(false); document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
   return <div className="relative" ref={ref}>
     <Button variant="outline" size="icon" aria-label="التنبيهات" onClick={() => setOpen((o) => !o)} className="relative">
-      <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[0.75rem] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
+      <Bell />{count > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[0.75rem] font-bold text-white ring-2 ring-background">{count}</span>}
     </Button>
     {open && <div className="z-40 rounded-lg border bg-card shadow-pop animate-in max-sm:fixed max-sm:inset-x-3 max-sm:top-[68px] sm:absolute sm:end-0 sm:top-11 sm:w-[360px]">
       <div className="flex items-center justify-between border-b px-4 py-3">
@@ -86,7 +88,11 @@ function BellMenu() {
         {permission() === 'default' && <button className="text-xs font-medium text-brand hover:underline" onClick={() => enableNotifications()}>تفعيل الإشعارات</button>}
       </div>
       <div className="max-h-[60vh] overflow-auto p-2">
-        {overdue.length ? overdue.slice(0, 30).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => { setOpen(false); go({ name: 'customer', id: c.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
+        {reps.map(({ r, s }) => <button key={r.id} onClick={() => { setOpen(false); if (me.role === 'admin') go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
+          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-warning" />
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{r.id === me.id ? 'انت' : r.full_name}</span><span className="shrink-0 text-xs font-medium text-warning">عدّى حد الائتمان</span></span><span className="block text-xs text-muted-foreground">المديونية {money(s.total)} من {money(s.limit)} ج.م</span></span>
+        </button>)}
+        {count ? overdue.slice(0, 30).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => { setOpen(false); go({ name: 'customer', id: c.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-danger" />
           <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{c.name}</span><span className="shrink-0 text-xs font-medium text-danger">متأخر {s.overdueDays} يوم</span></span><span className="block text-xs text-muted-foreground">عليه {money(s.balance)} ج.م{me.role === 'admin' ? ' · ' + nameOf(c.rep_id) : ''}</span></span>
         </button>; }) : <p className="p-6 text-center text-sm text-muted-foreground">لا توجد تنبيهات.</p>}
@@ -126,7 +132,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? 'مدير' : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.agency_id ? 'مدير · ' + agencyName(me.agency_id) : 'مدير عام') : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>

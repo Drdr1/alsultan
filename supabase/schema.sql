@@ -43,6 +43,27 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active);
 $$;
 
+-- Two kinds of admin:
+--   head admin (Sayed, Mohamed): agency_id is null -> every agency.
+--   agency manager: agency_id set -> only that agency's reps, customers and ledger.
+create or replace function public.admin_agency() returns uuid
+language sql stable security definer set search_path = public as $$
+  select agency_id from public.profiles where id = auth.uid() and role = 'admin' and active;
+$$;
+
+create or replace function public.is_head_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active and agency_id is null);
+$$;
+
+-- Can the current admin see / manage this rep (and the rep's customers and ledger)?
+create or replace function public.can_manage_rep(rid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_head_admin() or exists (
+    select 1 from public.profiles r
+    where r.id = rid and r.role = 'rep' and r.agency_id is not null and r.agency_id = public.admin_agency());
+$$;
+
 -- New sign-up -> inactive rep profile (admin activates + sets limit)
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -83,6 +104,12 @@ begin
   if auth.uid() is not null and not public.is_admin() then
     raise exception 'التعديل مسموح للإدارة فقط';
   end if;
+  -- agency managers: only their own agency's reps, no role changes, no moving reps to another agency
+  if auth.uid() is not null and not public.is_head_admin() then
+    if not public.can_manage_rep(old.id) then raise exception 'الحساب ده مش في توكيلك'; end if;
+    if new.role <> old.role then raise exception 'تغيير الصلاحية للمدير العام بس'; end if;
+    if new.agency_id is distinct from public.admin_agency() then raise exception 'مينفعش تنقل مندوب لتوكيل تاني'; end if;
+  end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('profile', old.id::text, 'update', jsonb_build_object(
     'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type, 'agency_id', old.agency_id),
@@ -118,6 +145,8 @@ begin
   if me.id is null or not me.active then raise exception 'الحساب غير مفعل'; end if;
   if me.role <> 'admin' then
     new.rep_id := me.id;
+  elsif not public.can_manage_rep(new.rep_id) then
+    raise exception 'المندوب ده مش في توكيلك';
   end if;
   -- the customer's type always follows the rep who owns it
   new.debt_type := coalesce((select rep_type from public.profiles where id = new.rep_id), 'retail');
@@ -135,6 +164,11 @@ create or replace function public.guard_customer_update() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'تعديل بيانات العميل للإدارة فقط'; end if;
+  if not public.can_manage_rep(old.rep_id) or not public.can_manage_rep(new.rep_id) then
+    raise exception 'العميل ده مش في توكيلك';
+  end if;
+  new.debt_type := coalesce((select rep_type from public.profiles where id = new.rep_id), old.debt_type);
+  new.agency_id := (select agency_id from public.profiles where id = new.rep_id);
   insert into public.audit_log (entity, entity_id, action, details)
   values ('customer', old.id::text, 'update', jsonb_build_object('before', to_jsonb(old), 'after', to_jsonb(new)));
   return new;
@@ -196,6 +230,7 @@ begin
   select * into cust from public.customers where id = new.customer_id;
   if cust.id is null then raise exception 'العميل غير موجود'; end if;
   if me.role <> 'admin' and cust.rep_id <> me.id then raise exception 'العميل ده مش بتاعك'; end if;
+  if me.role = 'admin' and not public.can_manage_rep(cust.rep_id) then raise exception 'العميل ده مش في توكيلك'; end if;
 
   new.rep_id     := cust.rep_id;
   new.created_by := me.id;
@@ -247,7 +282,7 @@ create trigger tx_guard_ins before insert on public.transactions
 create or replace function public.guard_tx_update() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_admin() then raise exception 'السجلات لا تعدل'; end if;
+  if not public.is_admin() or not public.can_manage_rep(old.rep_id) then raise exception 'السجلات لا تعدل'; end if;
   if old.status <> 'pending' or new.status not in ('approved','rejected') then
     raise exception 'المسموح فقط مراجعة طلب تصحيح معلق';
   end if;
@@ -307,36 +342,39 @@ alter table public.transactions enable row level security;
 alter table public.audit_log    enable row level security;
 alter table public.agencies     enable row level security;
 
--- Agency names are public (the sign-up page lists them); only admins add or rename.
+-- Agency names are public (the sign-up page lists them; the app hides other agencies from managers).
+-- Only head admins add or rename agencies.
 drop policy if exists agencies_select on public.agencies;
 create policy agencies_select on public.agencies for select using (true);
 drop policy if exists agencies_insert on public.agencies;
-create policy agencies_insert on public.agencies for insert with check (public.is_admin());
+create policy agencies_insert on public.agencies for insert with check (public.is_head_admin());
 drop policy if exists agencies_update on public.agencies;
-create policy agencies_update on public.agencies for update using (public.is_admin());
+create policy agencies_update on public.agencies for update using (public.is_head_admin());
 grant select on public.agencies to anon;
 
 drop policy if exists profiles_select on public.profiles;
-create policy profiles_select on public.profiles for select using (id = auth.uid() or public.is_admin());
+create policy profiles_select on public.profiles for select using (
+  id = auth.uid() or public.can_manage_rep(id)
+  or (public.is_admin() and role = 'admin' and (agency_id is null or agency_id = public.admin_agency())));
 drop policy if exists profiles_update on public.profiles;
-create policy profiles_update on public.profiles for update using (public.is_admin());
+create policy profiles_update on public.profiles for update using (public.is_admin() and public.can_manage_rep(id) or public.is_head_admin());
 
 drop policy if exists customers_select on public.customers;
-create policy customers_select on public.customers for select using (rep_id = auth.uid() or public.is_admin());
+create policy customers_select on public.customers for select using (rep_id = auth.uid() or public.can_manage_rep(rep_id));
 drop policy if exists customers_insert on public.customers;
-create policy customers_insert on public.customers for insert with check (rep_id = auth.uid() or public.is_admin());
+create policy customers_insert on public.customers for insert with check (rep_id = auth.uid() or public.can_manage_rep(rep_id));
 drop policy if exists customers_update on public.customers;
-create policy customers_update on public.customers for update using (public.is_admin());
+create policy customers_update on public.customers for update using (public.can_manage_rep(rep_id));
 
 drop policy if exists tx_select on public.transactions;
-create policy tx_select on public.transactions for select using (rep_id = auth.uid() or public.is_admin());
+create policy tx_select on public.transactions for select using (rep_id = auth.uid() or public.can_manage_rep(rep_id));
 drop policy if exists tx_insert on public.transactions;
-create policy tx_insert on public.transactions for insert with check (rep_id = auth.uid() or public.is_admin());
+create policy tx_insert on public.transactions for insert with check (rep_id = auth.uid() or public.can_manage_rep(rep_id));
 drop policy if exists tx_update on public.transactions;
-create policy tx_update on public.transactions for update using (public.is_admin());
+create policy tx_update on public.transactions for update using (public.can_manage_rep(rep_id));
 
 drop policy if exists audit_select on public.audit_log;
-create policy audit_select on public.audit_log for select using (public.is_admin());
+create policy audit_select on public.audit_log for select using (public.is_head_admin());
 
 -- ---------------------------------------------------------------------
 -- Realtime (instant updates without refresh)
@@ -350,6 +388,10 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- After Sayed and Mohamed sign up from the site, make them admins:
---   update public.profiles set role = 'admin', active = true where username in ('sayed','mohamed');
+--   update public.profiles set role = 'admin', active = true, agency_id = null where username in ('sayed','mohamed');
+-- Agency managers (see one agency only), e.g. Tiger:
+--   update public.profiles set role = 'admin', active = true,
+--     agency_id = (select id from public.agencies where name = 'تايجر')
+--   where username in ('barqi','younis','aref');
 -- (run in SQL editor; the guard trigger allows it because the SQL editor runs as postgres)
 -- ---------------------------------------------------------------------

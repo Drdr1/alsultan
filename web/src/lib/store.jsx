@@ -18,7 +18,9 @@ export function AppProvider({ children }) {
   const [view, setView] = useState({ name: 'home' });
   const [stack, setStack] = useState([]);
   const [tick, setTick] = useState(0);
-  const agencies = raw.agencies || [];
+  // Head admin: no agency on the profile (sees every agency). Agency manager: admin with an agency (sees only it).
+  const scope = me?.role === 'admin' ? me.agency_id || null : null;
+  const agencies = useMemo(() => (raw.agencies || []).filter((a) => !scope || a.id === scope), [raw.agencies, scope]);
   // Admins always look at one agency at a time (no combined numbers across agencies).
   const activeAgency = me?.role !== 'admin' || !agencies.length ? 'all' : (agencies.some((a) => a.id === agency) ? agency : agencies[0].id);
   // Admin can narrow every page to one agency: filter the data once, here.
@@ -59,8 +61,7 @@ export function AppProvider({ children }) {
                 const c = d.customers.find((x) => x.id === evt.row.customer_id);
                 const who = d.profiles.find((p) => p.id === evt.row.created_by)?.full_name || '';
                 const msg = `${who}: ${KIND[evt.row.kind]} ${money(Math.abs(evt.row.amount))} ج.م${c ? ' · ' + c.name : ''}`;
-                toast(msg, 'live');
-                if (document.hidden) notify('دفتر السلطان', msg, 'tx-' + evt.row.id, '#customer=' + evt.row.customer_id);
+                toast(msg, 'live'); // in-app only: no phone notification per collection
               }, 300);
             }
           }
@@ -80,24 +81,33 @@ export function AppProvider({ children }) {
 
   const stats = useMemo(() => {
     const now = Date.now();
-    return new Map(data.customers.map((c) => [c.id, analyzeCustomer(c, data.transactions, now)]));
-  }, [data, tick]);
+    return new Map(raw.customers.map((c) => [c.id, analyzeCustomer(c, raw.transactions, now)]));
+  }, [raw, tick]);
 
   const reps = useMemo(() => data.profiles.filter((p) => p.role === 'rep'), [data.profiles]);
   const overdue = useMemo(() => data.customers.filter((c) => stats.get(c.id)?.overdue).sort((a, b) => stats.get(b.id).overdueDays - stats.get(a.id).overdueDays), [data.customers, stats]);
   const nameOf = useCallback((id) => data.profiles.find((p) => p.id === id)?.full_name || (id === me?.id ? me?.full_name : '—'), [data.profiles, me]);
   const summaryOf = useCallback((rep) => repSummary(rep, data.customers, stats), [data.customers, stats]);
 
+  // Phone notifications, only for two things (across every agency this user can see, whatever agency is on screen):
+  // a customer passing the credit term, and a rep going over his credit limit. Once a day each.
+  const overdueAll = useMemo(() => raw.customers.filter((c) => stats.get(c.id)?.overdue), [raw.customers, stats]);
+  const overLimit = useMemo(() => raw.profiles.filter((p) => p.role === 'rep' && p.active).map((r) => ({ r, s: repSummary(r, raw.customers, stats) })).filter((x) => x.s.over), [raw.profiles, raw.customers, stats]);
   useEffect(() => {
     if (!me || permission() !== 'granted') return;
-    const fresh = overdue.filter((c) => !notified.current.has(c.id));
-    if (!fresh.length) return;
-    fresh.forEach((c) => notified.current.add(c.id));
+    const mark = (k) => { if (notified.current.has(k)) return false; notified.current.add(k); return true; };
+    const freshReps = overLimit.filter(({ r }) => mark('rep-' + r.id));
+    const fresh = overdueAll.filter((c) => mark(c.id));
+    if (!fresh.length && !freshReps.length) return;
     try { localStorage.setItem(NKEY, JSON.stringify([...notified.current])); } catch { /* storage blocked */ }
+    freshReps.forEach(({ r, s }) => {
+      const mine = r.id === me.id;
+      notify(mine ? 'عدّيت حد الائتمان بتاعك' : `${r.full_name} عدّى حد الائتمان`, `المديونية ${money(s.total)} ج.م والحد ${money(s.limit)} ج.م`, 'limit-' + r.id, mine ? '' : '#rep=' + r.id);
+    });
     // One notification per customer (tap opens that customer); a summary if there are many.
     if (fresh.length <= 4) fresh.forEach((c) => { const s = stats.get(c.id); notify(`${c.name} متأخر ${s.overdueDays} يوم`, `عليه ${money(s.balance)} ج.م وعدّى مدة الأجل (${TERM_DAYS} يوم)`, 'overdue-' + c.id, '#customer=' + c.id); });
     else notify(`${fresh.length} عملاء متأخرين`, fresh.slice(0, 3).map((c) => c.name).join('، ') + ` و${fresh.length - 3} غيرهم عدّوا ${TERM_DAYS} يوم`, 'overdue', '#overdue');
-  }, [overdue, me]);
+  }, [overdueAll, overLimit, me]);
 
   // Open the page a tapped notification points to (once the data is loaded).
   const [targetTick, setTargetTick] = useState(0);
@@ -112,6 +122,11 @@ export function AppProvider({ children }) {
       const rep = raw.profiles.find((p) => p.id === c.rep_id);
       if (me.role === 'admin' && rep?.agency_id) setAgency(rep.agency_id);
       setStack([{ name: 'overdue' }]); setView({ name: 'customer', id: c.id }); window.scrollTo({ top: 0 });
+    } else if (/^#rep=/.test(t)) {
+      const r = raw.profiles.find((p) => p.id === decodeURIComponent(t.slice(5)));
+      if (!r || me.role !== 'admin') return;
+      if (r.agency_id) setAgency(r.agency_id);
+      setStack([{ name: 'reps' }]); setView({ name: 'rep', id: r.id }); window.scrollTo({ top: 0 });
     } else if (t === '#overdue') { setStack([]); setView({ name: 'overdue' }); window.scrollTo({ top: 0 }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, raw, targetTick]);
@@ -123,6 +138,6 @@ export function AppProvider({ children }) {
   const signIn = async (u, p) => { const m = await api.signIn(u, p); setMe(m); setView({ name: 'home' }); setStack([]); await reload(); };
   const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [] }); setView({ name: 'home' }); setStack([]); };
 
-  const value = { api, boot, me, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const value = { api, boot, me, scope, overLimit, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
