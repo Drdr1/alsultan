@@ -76,16 +76,20 @@ export function repSummary(rep, customers, stats) {
   return { customers: mine, total, month, overdue, retail, wholesale, limit, over: total > limit, pct: limit ? total / limit : (total > 0 ? 2 : 0) };
 }
 
+/* ---------------- roles ---------------- */
+export const isOwner = (p) => !!p && p.role === 'admin' && p.active !== false && !!p.is_owner;
+export const inScopes = (admin, rep) => (admin?.scopes || []).some((x) => x.agency_id === rep.agency_id && x.rep_type === rep.rep_type);
+
 /* ---------------- demo backend (local, realtime across tabs) ---------------- */
 export function demoSeed() {
   const now = Date.now();
   const at = (daysAgo, h = 11) => { const d = new Date(now - daysAgo * DAY); d.setHours(h, 15, 0, 0); return d.toISOString(); };
   const profiles = [
-    { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
-    { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
-    { id: 'u-barqi', username: 'barqi', full_name: 'محمد البرقي', role: 'admin', agency_id: 'ag-tiger', credit_limit: 0, active: true, created_at: at(110) },
-    { id: 'u-younis', username: 'younis', full_name: 'محمد يونس', role: 'admin', agency_id: 'ag-tiger', credit_limit: 0, active: true, created_at: at(110) },
-    { id: 'u-aref', username: 'aref', full_name: 'أحمد عارف', role: 'admin', agency_id: 'ag-tiger', credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', is_owner: true, credit_limit: 0, active: true, created_at: at(120) },
+    { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', is_owner: true, credit_limit: 0, active: true, created_at: at(120) },
+    { id: 'u-barqi', username: 'barqi', full_name: 'محمد البرقي', role: 'admin', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }], credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-younis', username: 'younis', full_name: 'محمد يونس', role: 'admin', scopes: [{ agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-aref', username: 'aref', full_name: 'أحمد عارف', role: 'admin', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, rep_type: 'wholesale', agency_id: 'ag-tiger', active: true, created_at: at(100) },
     { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, rep_type: 'retail', agency_id: 'ag-molfix', active: true, created_at: at(100) },
     { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, rep_type: 'retail', agency_id: 'ag-tiger', active: true, created_at: at(100) },
@@ -143,7 +147,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v4';
+  const KEY = 'alsultan-demo-v5';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -162,13 +166,13 @@ export function DemoBackend() {
   };
   const setSession = (id) => { memSession = id; safe(() => (id ? sessionStorage.setItem(SKEY, id) : sessionStorage.removeItem(SKEY))); };
   const requireActive = () => { const m = me(); if (!m || !m.active) throw new Error('الحساب غير مفعل'); return m; };
-  // An admin with agency_id is an agency manager: sees and manages that agency only.
-  const scopeOf = (m) => (m.role === 'admin' ? m.agency_id || null : null);
+  // Owners (Sayed, Mohamed) see everything. Other admins are managers: they see the reps whose
+  // agency + type (retail/wholesale) is in their scopes, set by an owner from the settings page.
   const repVisible = (m, repId) => {
     if (m.role !== 'admin') return repId === m.id;
-    const sc = scopeOf(m); if (!sc) return true;
+    if (isOwner(m)) return true;
     const r = db.profiles.find((p) => p.id === repId);
-    return !!r && r.role === 'rep' && r.agency_id === sc;
+    return !!r && r.role === 'rep' && inScopes(m, r);
   };
   const balOf = (pred) => db.transactions.filter((t) => t.status === 'approved' && pred(t)).reduce((s, t) => s + effect(t), 0);
 
@@ -229,12 +233,11 @@ export function DemoBackend() {
     async loadAll() {
       const m = me(); if (!m) return { agencies: [], profiles: [], customers: [], transactions: [] };
       if (m.role === 'admin') {
-        const sc = scopeOf(m);
-        if (!sc) return structuredClone({ agencies: db.agencies, profiles: db.profiles, customers: db.customers, transactions: db.transactions });
+        if (isOwner(m)) return structuredClone({ agencies: db.agencies, profiles: db.profiles, customers: db.customers, transactions: db.transactions });
         const reps = new Set(db.profiles.filter((p) => repVisible(m, p.id)).map((p) => p.id));
         return structuredClone({
-          agencies: db.agencies.filter((a) => a.id === sc),
-          profiles: db.profiles.filter((p) => reps.has(p.id) || (p.role === 'admin' && (!p.agency_id || p.agency_id === sc))),
+          agencies: db.agencies.filter((a) => (m.scopes || []).some((x) => x.agency_id === a.id)),
+          profiles: db.profiles.filter((p) => reps.has(p.id) || p.id === m.id || isOwner(p)),
           customers: db.customers.filter((c) => reps.has(c.rep_id)),
           transactions: db.transactions.filter((t) => reps.has(t.rep_id)),
         });
@@ -265,18 +268,18 @@ export function DemoBackend() {
       const m = requireActive(); if (m.role !== 'admin') throw new Error('للإدارة فقط');
       const p = db.profiles.find((x) => x.id === id);
       if (!p) throw new Error('الحساب مش موجود');
-      const sc = scopeOf(m);
-      if (sc) {
-        if (!repVisible(m, id)) throw new Error('الحساب ده مش في توكيلك');
-        if ('role' in patch && patch.role !== p.role) throw new Error('تغيير الصلاحية للمدير العام بس');
-        if ('agency_id' in patch && patch.agency_id !== sc) throw new Error('مينفعش تنقل مندوب لتوكيل تاني');
-      }
+      if ('is_owner' in patch && !!patch.is_owner !== !!p.is_owner) throw new Error('مينفعش تغيير المالك من هنا');
+      if (!isOwner(m)) {
+        if (!repVisible(m, id)) throw new Error('الحساب ده مش في صلاحياتك');
+        if (('role' in patch && patch.role !== p.role) || 'scopes' in patch) throw new Error('الصلاحيات بيحددها المالك بس');
+        if (!inScopes(m, { ...p, ...patch })) throw new Error('مينفعش تنقل مندوب لحاجة مش في صلاحياتك');
+      } else if (isOwner(p) && p.id !== m.id) throw new Error('مينفعش تعدّل حساب مالك تاني');
       Object.assign(p, patch);
       commit({ table: 'profiles', type: 'UPDATE', row: p });
     },
     async listAgencies() { return structuredClone(db.agencies); },
     async addAgency(name) {
-      const m = requireActive(); if (m.role !== 'admin' || scopeOf(m)) throw new Error('للمدير العام بس');
+      const m = requireActive(); if (!isOwner(m)) throw new Error('للمالك بس');
       const n = String(name || '').trim(); if (!n) throw new Error('اكتب اسم التوكيل');
       if (db.agencies.some((a) => a.name === n)) throw new Error('التوكيل ده موجود');
       const a = { id: 'ag-' + uid(), name: n, created_at: new Date().toISOString() };

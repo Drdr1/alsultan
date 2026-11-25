@@ -3,7 +3,7 @@ import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, U
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, REP_TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs } from './components/dialogs.jsx';
-import { Logo, ThemeToggle } from './components/layout.jsx';
+import { ThemeToggle } from './components/layout.jsx';
 import { MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
 import { CustomerTable, CreditCard, TrendCard, RepBarsCard, RepCard, StatCard, DueBadge, initials } from './components/app.jsx';
 
@@ -113,11 +113,11 @@ export function AdminHome() {
 }
 
 function AgenciesCard() {
-  const { api, raw, agencies, agency, setAgency, toast, scope } = useApp();
+  const { api, raw, agencies, agency, setAgency, toast, owner } = useApp();
   const [adding, setAdding] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => { const a = await api.addAgency(fd.get('name')); toast(`تمت إضافة توكيل ${a.name}`); setAdding(false); });
   const count = (id) => raw.profiles.filter((p) => p.role === 'rep' && p.active && p.agency_id === id).length;
-  if (scope) return null; // agency managers only ever see their own agency
+  if (!owner) return null; // managers only see the agencies the owner gave them
   return <Card>
     <CardHeader><div><CardTitle>التوكيلات</CardTitle><CardDescription>كل مندوب تبع توكيل واحد، وكل توكيل أرقامه لوحده. اختار التوكيل اللي عايز تشوفه.</CardDescription></div>
       {!adding && <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Store />توكيل جديد</Button>}</CardHeader>
@@ -342,11 +342,11 @@ export function CustomerPage({ id }) {
 function AuthShell({ children }) {
   return <div className="relative grid min-h-full lg:grid-cols-2">
     <ThemeToggle className="absolute end-4 top-4 z-10 lg:end-auto lg:start-4" />
-    <div className="flex items-center justify-center px-5 py-12">
+    <div className="flex items-center justify-center px-5 pb-12 pt-20 lg:py-12">
       <div className="grid w-full max-w-sm gap-7">{children}</div>
     </div>
     <div className="relative hidden flex-col justify-between overflow-hidden border-s bg-sidebar p-10 lg:flex">
-      <div className="flex items-center gap-3"><Logo /><div><div className="font-bold">السلطان للتوزيع</div><div className="text-xs text-muted-foreground">السويس</div></div></div>
+      <img src="./logo-banner.jpg" alt="شركة السلطان" className="w-full max-w-md rounded-xl shadow-card" />
       <div className="grid max-w-md gap-6">
         <div><h2 className="text-3xl font-bold leading-tight tracking-tight">دفتر مديونيات المناديب</h2><p className="mt-3 leading-relaxed text-muted-foreground">تسجيل العملاء والتحصيل اليومي، ومتابعة لحظية للإدارة، وأرشيف كامل لكل حركة لا يُحذف.</p></div>
         <div className="grid grid-cols-2 gap-3">
@@ -367,7 +367,7 @@ export function LoginPage() {
   const login = useSubmit(async (fd) => signIn(fd.get('username'), fd.get('password')));
   const signup = useSubmit(async (fd) => { if (ags.length && !fd.get('agency_id')) throw new Error('اختار التوكيل اللي شغال فيه'); if (!fd.get('rep_type')) throw new Error('اختار نوع المندوب: قطاعي ولا جملة'); await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim(), String(fd.get('rep_type')), fd.get('agency_id') || null); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
   return <AuthShell>
-    <div className="flex items-center gap-3 lg:hidden"><Logo /><span className="font-bold">السلطان للتوزيع</span></div>
+    <img src="./logo-banner.jpg" alt="شركة السلطان" className="w-full rounded-xl lg:hidden" />
     <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
     {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[0.875rem] text-success">{done}</div>}
     {tab === 'login' ? <form onSubmit={login.submit} className="grid gap-4">
@@ -390,7 +390,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير تايجر'], ['younis', 'محمد يونس', 'مدير تايجر'], ['aref', 'أحمد عارف', 'مدير تايجر'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'المالك'], ['mohamed', 'محمد', 'المالك'], ['barqi', 'محمد البرقي', 'مدير تايجر قطاعي'], ['younis', 'محمد يونس', 'مدير تايجر جملة'], ['aref', 'أحمد عارف', 'مدير تايجر قطاعي وجملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
@@ -404,4 +404,83 @@ export function InactivePage() {
     <div><h1 className="text-2xl font-bold">أهلاً {me.full_name}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">حسابك بانتظار التفعيل من الإدارة وتحديد حد الائتمان. هذه الصفحة هتتحدث تلقائياً أول ما يتفعل.</p></div>
     <Button variant="outline" onClick={signOut}>تسجيل الخروج</Button>
   </AuthShell>;
+}
+
+/* ================= settings (owners only) ================= */
+function ScopeChip({ on, onClick, children, disabled }) {
+  return <button type="button" disabled={disabled} aria-pressed={on} onClick={onClick} className={cn('inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors disabled:opacity-50', on ? 'border-foreground bg-foreground text-background' : 'bg-card text-muted-foreground hover:bg-muted')}>
+    {on ? <Check className="size-4" /> : <span className="size-4" />}{children}</button>;
+}
+
+function ManagerRow({ m }) {
+  const { api, toast, raw } = useApp();
+  const [busy, setBusy] = useState(false);
+  const save = async (patch, msg) => { setBusy(true); try { await api.updateProfile(m.id, patch); if (msg) toast(msg); } catch (e) { toast(e.message, 'err'); } finally { setBusy(false); } };
+  const scopes = m.scopes || [];
+  const has = (a, t) => scopes.some((x) => x.agency_id === a && x.rep_type === t);
+  const toggle = (a, t) => save({ scopes: has(a, t) ? scopes.filter((x) => !(x.agency_id === a && x.rep_type === t)) : [...scopes, { agency_id: a, rep_type: t }] });
+  return <div className="grid gap-3 rounded-lg border p-4" data-manager={m.username}>
+    <div className="flex flex-wrap items-center gap-3">
+      <Avatar name={m.full_name.charAt(0)} tone="brand" />
+      <div className="min-w-0 flex-1"><div className="font-semibold">{m.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{m.username}</span>{!m.active && ' · موقوف'}</div></div>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ active: !m.active }, m.active ? `تم إيقاف ${m.full_name}` : `تم تفعيل ${m.full_name}`)}>{m.active ? 'إيقاف' : 'تفعيل'}</Button>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ role: 'rep', scopes: [], active: false }, `${m.full_name} رجع حساب مندوب (موقوف)`)}>إلغاء الإدارة</Button>
+    </div>
+    <div className="grid gap-2">
+      {raw.agencies.map((a) => <div key={a.id} className="flex flex-wrap items-center gap-2">
+        <span className="w-24 shrink-0 text-sm font-medium">{a.name}</span>
+        <ScopeChip disabled={busy} on={has(a.id, 'retail')} onClick={() => toggle(a.id, 'retail')}>قطاعي</ScopeChip>
+        <ScopeChip disabled={busy} on={has(a.id, 'wholesale')} onClick={() => toggle(a.id, 'wholesale')}>جملة</ScopeChip>
+      </div>)}
+    </div>
+    {!scopes.length && <p className="text-xs text-warning">مش شايف أي حاجة لحد ما تختارله توكيل.</p>}
+  </div>;
+}
+
+function RepAccessRow({ r }) {
+  const { api, toast, raw, agencyName } = useApp();
+  const save = async (patch) => { try { await api.updateProfile(r.id, patch); toast(`تم تعديل ${r.full_name}`); } catch (e) { toast(e.message, 'err'); } };
+  const n = raw.customers.filter((c) => c.rep_id === r.id).length;
+  return <TR>
+    <TD><div className="font-medium">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · {n} عميل{!r.active && ' · موقوف'}</div></TD>
+    <TD><Select aria-label="التوكيل" value={r.agency_id || ''} onChange={(e) => save({ agency_id: e.target.value })} className="w-32">{!r.agency_id && <option value="">—</option>}{raw.agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></TD>
+    <TD><Select aria-label="النوع" value={r.rep_type || 'retail'} onChange={(e) => save({ rep_type: e.target.value })} className="w-28"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></TD>
+    <TD className="text-xs text-muted-foreground max-md:hidden">{raw.profiles.filter((m) => m.role === 'admin' && (m.is_owner || (m.scopes || []).some((x) => x.agency_id === r.agency_id && x.rep_type === r.rep_type))).map((m) => m.full_name).join('، ') || agencyName(r.agency_id)}</TD>
+  </TR>;
+}
+
+export function SettingsPage() {
+  const { raw, owner, api, toast } = useApp();
+  const [pick, setPick] = useState('');
+  if (!owner) return <Empty icon={Lock} title="الصفحة دي للمالك بس" />;
+  const owners = raw.profiles.filter((p) => p.role === 'admin' && p.is_owner);
+  const managers = raw.profiles.filter((p) => p.role === 'admin' && !p.is_owner);
+  const reps = raw.profiles.filter((p) => p.role === 'rep');
+  const promotable = reps.filter((r) => !raw.customers.some((c) => c.rep_id === r.id));
+  const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [] }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
+  return <>
+    <Card>
+      <CardHeader><div><CardTitle>المديرين</CardTitle><CardDescription>اختار لكل مدير التوكيل والنوع اللي يشوفه. المدير مش بيشوف غير مناديب وعملاء الحاجات اللي متعلّم عليها، والتعديل بيتحفظ على طول.</CardDescription></div></CardHeader>
+      <CardContent className="grid gap-3">
+        {managers.length ? managers.map((m) => <ManagerRow key={m.id} m={m} />) : <Empty icon={Users} title="مفيش مديرين لسه" />}
+        <div className="grid gap-2 rounded-lg border border-dashed p-4">
+          <div className="text-sm font-medium">إضافة مدير</div>
+          <p className="text-xs text-muted-foreground">المدير يعمل حساب من صفحة التسجيل عادي، وبعدين تختاره هنا. (الحسابات اللي عليها عملاء مش بتظهر هنا.)</p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-[1_1_220px]"><Select aria-label="اختار الحساب" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">اختار الحساب…</option>{promotable.map((r) => <option key={r.id} value={r.id}>{r.full_name} (@{r.username})</option>)}</Select></div>
+            <Button type="button" disabled={!pick} onClick={promote}><Check />خليه مدير</Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>كل مندوب تبع توكيل واحد ونوع واحد، وده اللي بيحدد مين من المديرين يشوفه.</CardDescription></div></CardHeader>
+      <CardContent className="p-0"><Table><THead><TR><TH>المندوب</TH><TH>التوكيل</TH><TH>النوع</TH><TH className="max-md:hidden">بيشوفه</TH></TR></THead>
+        <TBody>{reps.map((r) => <RepAccessRow key={r.id} r={r} />)}</TBody></Table></CardContent>
+    </Card>
+    <Card>
+      <CardHeader><div><CardTitle>المُلّاك</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
+      <CardContent className="flex flex-wrap gap-3">{owners.map((o) => <div key={o.id} className="flex items-center gap-2 rounded-md border px-3 py-2"><Avatar name={o.full_name.charAt(0)} size="sm" tone="brand" /><span className="text-sm font-medium">{o.full_name}</span></div>)}</CardContent>
+    </Card>
+  </>;
 }

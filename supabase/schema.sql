@@ -44,25 +44,34 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- Two kinds of admin:
---   head admin (Sayed, Mohamed): agency_id is null -> every agency.
---   agency manager: agency_id set -> only that agency's reps, customers and ledger.
-create or replace function public.admin_agency() returns uuid
+--   owner (Sayed, Mohamed): is_owner = true -> every agency; only owners set permissions.
+--   manager: scopes = [{"agency_id": "...", "rep_type": "retail"|"wholesale"}, ...] set by an owner;
+--            sees only reps (and their customers / ledger) whose agency + type is in the list.
+alter table public.profiles add column if not exists is_owner boolean not null default false;
+alter table public.profiles add column if not exists scopes jsonb not null default '[]'::jsonb;
+
+create or replace function public.is_owner() returns boolean
 language sql stable security definer set search_path = public as $$
-  select agency_id from public.profiles where id = auth.uid() and role = 'admin' and active;
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active and is_owner);
 $$;
 
-create or replace function public.is_head_admin() returns boolean
+-- Is (agency, type) inside the current admin's scopes?
+create or replace function public.in_my_scopes(p_agency uuid, p_type text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active and agency_id is null);
+  select exists (
+    select 1 from public.profiles me, jsonb_array_elements(me.scopes) e
+    where me.id = auth.uid() and me.role = 'admin' and me.active
+      and e->>'agency_id' = p_agency::text and e->>'rep_type' = p_type);
 $$;
 
 -- Can the current admin see / manage this rep (and the rep's customers and ledger)?
 create or replace function public.can_manage_rep(rid uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.is_head_admin() or exists (
+  select public.is_owner() or exists (
     select 1 from public.profiles r
-    where r.id = rid and r.role = 'rep' and r.agency_id is not null and r.agency_id = public.admin_agency());
+    where r.id = rid and r.role = 'rep' and public.in_my_scopes(r.agency_id, r.rep_type));
 $$;
+
 
 -- New sign-up -> inactive rep profile (admin activates + sets limit)
 create or replace function public.handle_new_user() returns trigger
@@ -104,16 +113,21 @@ begin
   if auth.uid() is not null and not public.is_admin() then
     raise exception 'التعديل مسموح للإدارة فقط';
   end if;
-  -- agency managers: only their own agency's reps, no role changes, no moving reps to another agency
-  if auth.uid() is not null and not public.is_head_admin() then
-    if not public.can_manage_rep(old.id) then raise exception 'الحساب ده مش في توكيلك'; end if;
-    if new.role <> old.role then raise exception 'تغيير الصلاحية للمدير العام بس'; end if;
-    if new.agency_id is distinct from public.admin_agency() then raise exception 'مينفعش تنقل مندوب لتوكيل تاني'; end if;
+  if new.is_owner is distinct from old.is_owner and auth.uid() is not null then
+    raise exception 'مينفعش تغيير المالك من هنا';
+  end if;
+  if auth.uid() is not null and public.is_owner() then
+    if old.is_owner and old.id <> auth.uid() then raise exception 'مينفعش تعدّل حساب مالك تاني'; end if;
+  elsif auth.uid() is not null then
+    -- managers: only reps inside their scopes, never permissions, never move a rep outside their scopes
+    if not public.can_manage_rep(old.id) then raise exception 'الحساب ده مش في صلاحياتك'; end if;
+    if new.role <> old.role or new.scopes is distinct from old.scopes then raise exception 'الصلاحيات بيحددها المالك بس'; end if;
+    if not public.in_my_scopes(new.agency_id, new.rep_type) then raise exception 'مينفعش تنقل مندوب لحاجة مش في صلاحياتك'; end if;
   end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('profile', old.id::text, 'update', jsonb_build_object(
-    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type, 'agency_id', old.agency_id),
-    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name, 'rep_type', new.rep_type, 'agency_id', new.agency_id)));
+    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type, 'agency_id', old.agency_id, 'scopes', old.scopes),
+    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name, 'rep_type', new.rep_type, 'agency_id', new.agency_id, 'scopes', new.scopes)));
   return new;
 end $$;
 
@@ -343,21 +357,20 @@ alter table public.audit_log    enable row level security;
 alter table public.agencies     enable row level security;
 
 -- Agency names are public (the sign-up page lists them; the app hides other agencies from managers).
--- Only head admins add or rename agencies.
+-- Only owners add or rename agencies.
 drop policy if exists agencies_select on public.agencies;
 create policy agencies_select on public.agencies for select using (true);
 drop policy if exists agencies_insert on public.agencies;
-create policy agencies_insert on public.agencies for insert with check (public.is_head_admin());
+create policy agencies_insert on public.agencies for insert with check (public.is_owner());
 drop policy if exists agencies_update on public.agencies;
-create policy agencies_update on public.agencies for update using (public.is_head_admin());
+create policy agencies_update on public.agencies for update using (public.is_owner());
 grant select on public.agencies to anon;
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles for select using (
-  id = auth.uid() or public.can_manage_rep(id)
-  or (public.is_admin() and role = 'admin' and (agency_id is null or agency_id = public.admin_agency())));
+  id = auth.uid() or public.can_manage_rep(id) or (public.is_admin() and is_owner));
 drop policy if exists profiles_update on public.profiles;
-create policy profiles_update on public.profiles for update using (public.is_admin() and public.can_manage_rep(id) or public.is_head_admin());
+create policy profiles_update on public.profiles for update using (public.can_manage_rep(id));
 
 drop policy if exists customers_select on public.customers;
 create policy customers_select on public.customers for select using (rep_id = auth.uid() or public.can_manage_rep(rep_id));
@@ -374,7 +387,7 @@ drop policy if exists tx_update on public.transactions;
 create policy tx_update on public.transactions for update using (public.can_manage_rep(rep_id));
 
 drop policy if exists audit_select on public.audit_log;
-create policy audit_select on public.audit_log for select using (public.is_head_admin());
+create policy audit_select on public.audit_log for select using (public.is_owner());
 
 -- ---------------------------------------------------------------------
 -- Realtime (instant updates without refresh)
@@ -387,11 +400,8 @@ do $$ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- After Sayed and Mohamed sign up from the site, make them admins:
---   update public.profiles set role = 'admin', active = true, agency_id = null where username in ('sayed','mohamed');
--- Agency managers (see one agency only), e.g. Tiger:
---   update public.profiles set role = 'admin', active = true,
---     agency_id = (select id from public.agencies where name = 'تايجر')
---   where username in ('barqi','younis','aref');
+-- After Sayed and Mohamed sign up from the site, make them the owners:
+--   update public.profiles set role = 'admin', active = true, is_owner = true where username in ('sayed','mohamed');
+-- Managers are then set up by the owners from the app's settings page (no SQL needed).
 -- (run in SQL editor; the guard trigger allows it because the SQL editor runs as postgres)
 -- ---------------------------------------------------------------------

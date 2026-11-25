@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money } from './core.js';
+import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner } from './core.js';
 import { useToast } from '../components/ui.jsx';
 import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
@@ -18,9 +18,12 @@ export function AppProvider({ children }) {
   const [view, setView] = useState({ name: 'home' });
   const [stack, setStack] = useState([]);
   const [tick, setTick] = useState(0);
-  // Head admin: no agency on the profile (sees every agency). Agency manager: admin with an agency (sees only it).
-  const scope = me?.role === 'admin' ? me.agency_id || null : null;
-  const agencies = useMemo(() => (raw.agencies || []).filter((a) => !scope || a.id === scope), [raw.agencies, scope]);
+  // Owner (Sayed, Mohamed): every agency. Manager: only the agencies in the scopes an owner gave him.
+  const owner = isOwner(me);
+  const scopeKey = JSON.stringify(me?.scopes || []);
+  const agencies = useMemo(() => (raw.agencies || []).filter((a) => owner || me?.role !== 'admin' || (me.scopes || []).some((x) => x.agency_id === a.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [raw.agencies, owner, me?.role, scopeKey]);
   // Admins always look at one agency at a time (no combined numbers across agencies).
   const activeAgency = me?.role !== 'admin' || !agencies.length ? 'all' : (agencies.some((a) => a.id === agency) ? agency : agencies[0].id);
   // Admin can narrow every page to one agency: filter the data once, here.
@@ -138,6 +141,6 @@ export function AppProvider({ children }) {
   const signIn = async (u, p) => { const m = await api.signIn(u, p); setMe(m); setView({ name: 'home' }); setStack([]); await reload(); };
   const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [] }); setView({ name: 'home' }); setStack([]); };
 
-  const value = { api, boot, me, scope, overLimit, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const value = { api, boot, me, owner, overLimit, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

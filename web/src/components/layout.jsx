@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Storefront } from '@phosphor-icons/react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging } from './icons.jsx';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings } from './icons.jsx';
 import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
 import { permission, enableNotifications, isIOS, isStandalone, canInstall, install, onPWAChange } from '../lib/notify.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, Select, cn } from './ui.jsx';
 
 export function Logo({ className }) {
-  return <span className={cn('inline-flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground', className)} aria-hidden="true">
-    <Storefront weight="fill" className="size-5" />
-  </span>;
+  return <img src="./logo-mark.png" alt="" aria-hidden="true" className={cn('size-9 shrink-0 rounded-lg bg-black object-cover', className)} />;
 }
 
 export function ThemeToggle({ className }) {
@@ -55,8 +52,15 @@ function AgencyPicker({ className }) {
   </Select>;
 }
 
+// "تايجر: قطاعي وجملة · مولفيكس: جملة"
+export function scopeLabel(scopes, agencyName) {
+  const by = new Map();
+  for (const x of scopes || []) by.set(x.agency_id, [...(by.get(x.agency_id) || []), x.rep_type]);
+  return [...by].map(([a, t]) => `${agencyName(a)}: ${t.length > 1 ? 'قطاعي وجملة' : t[0] === 'wholesale' ? 'جملة' : 'قطاعي'}`).join(' · ');
+}
+
 function useNav() {
-  const { me, data, raw, overdue } = useApp();
+  const { me, data, raw, overdue, owner } = useApp();
   if (me.role === 'admin') return [
     ['home', LayoutDashboard, 'لوحة التحكم', 0],
     ['reps', Users, 'المناديب', 0],
@@ -64,12 +68,13 @@ function useNav() {
     ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger'],
     ['approvals', ClipboardCheck, 'طلبات التصحيح', data.transactions.filter((t) => t.status === 'pending').length, 'warning'],
     ['accounts', UserPlus, 'حسابات جديدة', raw.profiles.filter((r) => r.role === 'rep' && !r.active).length, 'brand'],
+    ...(owner ? [['settings', Settings, 'الإعدادات والصلاحيات', 0]] : []),
   ];
   return [['home', Home, 'الرئيسية', 0], ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger']];
 }
 
 const SHORT = { home: 'الرئيسية', approvals: 'التصحيح', accounts: 'الحسابات' };
-const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة' };
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة', settings: 'الإعدادات والصلاحيات' };
 
 function BellMenu() {
   const { overdue, go, me, nameOf, stats, overLimit, agency } = useApp();
@@ -132,7 +137,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.agency_id ? 'مدير · ' + agencyName(me.agency_id) : 'مدير عام') : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.is_owner ? 'المالك · كل التوكيلات' : scopeLabel(me.scopes, agencyName) || 'مدير') : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>
@@ -148,6 +153,7 @@ export function Layout({ children }) {
         </div>
         <div className="hidden w-48 shrink-0 md:block"><AgencyPicker /></div>
         <ThemeToggle />
+        {me.is_owner && <Button variant="outline" size="icon" className="lg:hidden" onClick={() => nav('settings')} aria-label="الإعدادات"><Settings /></Button>}
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
@@ -164,7 +170,7 @@ export function Layout({ children }) {
 
     {/* mobile bottom nav */}
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+      {items.filter(([k]) => k !== 'settings').map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
         <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
         {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
       </button>)}

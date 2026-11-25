@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { useApp } from './lib/store.jsx';
 import { Layout } from './components/layout.jsx';
-import { RepHome, AdminHome, RepsPage, CustomersPage, OverduePage, ApprovalsPage, AccountsPage, RepDetail, CustomerPage, LoginPage, InactivePage } from './pages.jsx';
+import { RepHome, AdminHome, RepsPage, CustomersPage, OverduePage, ApprovalsPage, AccountsPage, SettingsPage, RepDetail, CustomerPage, LoginPage, InactivePage } from './pages.jsx';
 
 export default function App() {
   const { boot, me, view } = useApp();
@@ -11,7 +11,7 @@ export default function App() {
   if (!me.active) return <InactivePage />;
   let page;
   if (view.name === 'customer') page = <CustomerPage id={view.id} />;
-  else if (me.role === 'admin') page = ({ rep: <RepDetail id={view.id} />, reps: <RepsPage />, customers: <CustomersPage />, overdue: <OverduePage />, approvals: <ApprovalsPage />, accounts: <AccountsPage /> })[view.name] || <AdminHome />;
+  else if (me.role === 'admin') page = ({ rep: <RepDetail id={view.id} />, reps: <RepsPage />, customers: <CustomersPage />, overdue: <OverduePage />, approvals: <ApprovalsPage />, accounts: <AccountsPage />, settings: <SettingsPage /> })[view.name] || <AdminHome />;
   else page = view.name === 'overdue' ? <OverduePage /> : <RepHome />;
   return <Layout><Fragment key={view.name + (view.id || '')}>{page}</Fragment></Layout>;
 }
