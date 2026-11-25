@@ -15,9 +15,12 @@ self.addEventListener('push', (e) => {
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-    for (const c of list) if (c.url.startsWith(self.registration.scope)) return c.focus();
+  const target = (e.notification.data && e.notification.data.url) || '';
+  const url = new URL(target || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
+    for (const c of list) {
+      if (c.url.startsWith(self.registration.scope)) { await c.focus(); c.postMessage({ type: 'open', url: target }); return; }
+    }
     return self.clients.openWindow(url);
   }));
 });

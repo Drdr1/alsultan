@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money } from './core.js';
 import { useToast } from '../components/ui.jsx';
-import { notify, permission } from './notify.js';
+import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -60,7 +60,7 @@ export function AppProvider({ children }) {
                 const who = d.profiles.find((p) => p.id === evt.row.created_by)?.full_name || '';
                 const msg = `${who}: ${KIND[evt.row.kind]} ${money(Math.abs(evt.row.amount))} ج.م${c ? ' · ' + c.name : ''}`;
                 toast(msg, 'live');
-                if (document.hidden) notify('دفتر السلطان', msg, 'tx-' + evt.row.id);
+                if (document.hidden) notify('دفتر السلطان', msg, 'tx-' + evt.row.id, '#customer=' + evt.row.customer_id);
               }, 300);
             }
           }
@@ -94,8 +94,27 @@ export function AppProvider({ children }) {
     if (!fresh.length) return;
     fresh.forEach((c) => notified.current.add(c.id));
     try { localStorage.setItem(NKEY, JSON.stringify([...notified.current])); } catch { /* storage blocked */ }
-    notify('عملاء متأخرين', fresh.slice(0, 3).map((c) => c.name).join('، ') + (fresh.length > 3 ? ` و${fresh.length - 3} غيرهم` : '') + ` عدّوا ${TERM_DAYS} يوم`, 'overdue');
+    // One notification per customer (tap opens that customer); a summary if there are many.
+    if (fresh.length <= 4) fresh.forEach((c) => { const s = stats.get(c.id); notify(`${c.name} متأخر ${s.overdueDays} يوم`, `عليه ${money(s.balance)} ج.م وعدّى مدة الأجل (${TERM_DAYS} يوم)`, 'overdue-' + c.id, '#customer=' + c.id); });
+    else notify(`${fresh.length} عملاء متأخرين`, fresh.slice(0, 3).map((c) => c.name).join('، ') + ` و${fresh.length - 3} غيرهم عدّوا ${TERM_DAYS} يوم`, 'overdue', '#overdue');
   }, [overdue, me]);
+
+  // Open the page a tapped notification points to (once the data is loaded).
+  const [targetTick, setTargetTick] = useState(0);
+  useEffect(() => onTarget(() => setTargetTick((n) => n + 1)), []);
+  useEffect(() => {
+    if (!me || !raw.customers.length || !peekTarget()) return;
+    const t = takeTarget();
+    const m = /^#customer=(.+)$/.exec(t);
+    if (m) {
+      const c = raw.customers.find((x) => x.id === decodeURIComponent(m[1]));
+      if (!c) return;
+      const rep = raw.profiles.find((p) => p.id === c.rep_id);
+      if (me.role === 'admin' && rep?.agency_id) setAgency(rep.agency_id);
+      setStack([{ name: 'overdue' }]); setView({ name: 'customer', id: c.id }); window.scrollTo({ top: 0 });
+    } else if (t === '#overdue') { setStack([]); setView({ name: 'overdue' }); window.scrollTo({ top: 0 }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, raw, targetTick]);
 
   const go = (v) => { setStack((s) => [...s, view]); setView(v); window.scrollTo({ top: 0 }); };
   const back = () => { setStack((s) => { const n = [...s]; setView(n.pop() || { name: 'home' }); return n; }); };
