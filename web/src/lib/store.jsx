@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money } from './core.js';
 import { useToast } from '../components/ui.jsx';
+import { notify, permission } from './notify.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -30,7 +31,9 @@ export function AppProvider({ children }) {
   const agencyName = useCallback((id) => agencies.find((a) => a.id === id)?.name || '', [agencies]);
   const meRef = useRef(null); meRef.current = me;
   const dataRef = useRef(data); dataRef.current = data;
-  const notified = useRef(new Set());
+  // Remember which overdue customers we already notified about today (once a day each).
+  const NKEY = 'alsultan-notified-' + new Date().toISOString().slice(0, 10);
+  const notified = useRef(new Set((() => { try { return JSON.parse(localStorage.getItem(NKEY)) || []; } catch { return []; } })()));
 
   const reload = useCallback(async (a = api) => {
     if (!a) return;
@@ -55,7 +58,9 @@ export function AppProvider({ children }) {
                 const d = dataRef.current;
                 const c = d.customers.find((x) => x.id === evt.row.customer_id);
                 const who = d.profiles.find((p) => p.id === evt.row.created_by)?.full_name || '';
-                toast(`${who}: ${KIND[evt.row.kind]} ${money(Math.abs(evt.row.amount))} ج.م${c ? ' · ' + c.name : ''}`, 'live');
+                const msg = `${who}: ${KIND[evt.row.kind]} ${money(Math.abs(evt.row.amount))} ج.م${c ? ' · ' + c.name : ''}`;
+                toast(msg, 'live');
+                if (document.hidden) notify('دفتر السلطان', msg, 'tx-' + evt.row.id);
               }, 300);
             }
           }
@@ -84,11 +89,12 @@ export function AppProvider({ children }) {
   const summaryOf = useCallback((rep) => repSummary(rep, data.customers, stats), [data.customers, stats]);
 
   useEffect(() => {
-    if (!me || !('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!me || permission() !== 'granted') return;
     const fresh = overdue.filter((c) => !notified.current.has(c.id));
     if (!fresh.length) return;
     fresh.forEach((c) => notified.current.add(c.id));
-    try { new Notification('السلطان: عملاء متأخرين', { body: fresh.slice(0, 3).map((c) => c.name).join('، ') + ` تجاوزوا ${TERM_DAYS} يوم` }); } catch { /* blocked */ }
+    try { localStorage.setItem(NKEY, JSON.stringify([...notified.current])); } catch { /* storage blocked */ }
+    notify('عملاء متأخرين', fresh.slice(0, 3).map((c) => c.name).join('، ') + (fresh.length > 3 ? ` و${fresh.length - 3} غيرهم` : '') + ` عدّوا ${TERM_DAYS} يوم`, 'overdue');
   }, [overdue, me]);
 
   const go = (v) => { setStack((s) => [...s, view]); setView(v); window.scrollTo({ top: 0 }); };

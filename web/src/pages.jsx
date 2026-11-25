@@ -4,7 +4,7 @@ import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, REP_TY
 import { useApp } from './lib/store.jsx';
 import { useDialogs } from './components/dialogs.jsx';
 import { Logo, ThemeToggle } from './components/layout.jsx';
-import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
+import { MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
 import { CustomerTable, CreditCard, TrendCard, RepBarsCard, RepCard, StatCard, DueBadge, initials } from './components/app.jsx';
 
 const Greeting = ({ name, children }) => {
@@ -196,7 +196,7 @@ function ActivateRow({ r }) {
       <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
       <div className="max-sm:w-full"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'} className="w-full sm:w-36"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div>
       <div className="max-sm:w-full"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency} className="w-full sm:w-40">{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div>
-      <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-full tnum sm:w-48" /></Field></div>
+      <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><MoneyInput name="limit" placeholder="500,000" className="w-full text-end sm:w-48" /></Field></div>
       <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button>
     </div>
     <FormError>{error}</FormError>
@@ -230,7 +230,7 @@ export function RepDetail({ id }) {
     <div className="grid gap-6 xl:grid-cols-5">
       <div className="xl:col-span-2"><CreditCard sum={s} title={`${r.full_name} · ${REP_TYPE[r.rep_type] || 'مندوب'}${agencyName(r.agency_id) ? ' · ' + agencyName(r.agency_id) : ''}`}>
         <form onSubmit={submit} className="mt-5 grid gap-2 border-t pt-4">
-          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><Input name="limit" inputMode="decimal" defaultValue={money(r.credit_limit)} className="tnum" /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><div className="flex-[1_1_110px]"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency}>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
+          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><MoneyInput name="limit" className="text-end" defaultValue={money(r.credit_limit)} /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><div className="flex-[1_1_110px]"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency}>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
           <FormError>{error}</FormError>
         </form>
         <div className="mt-4 border-t pt-4">{confirmStop ? <div className="flex flex-wrap items-center gap-2 text-sm"><span className="flex-1">إيقاف الحساب يمنع المندوب من الدخول. متأكد؟</span><Button size="sm" variant="danger" onClick={async () => { await api.updateProfile(id, { active: false }); toast('تم إيقاف حساب ' + r.full_name); back(); }}>إيقاف</Button><Button size="sm" variant="outline" onClick={() => setConfirmStop(false)}>إلغاء</Button></div>

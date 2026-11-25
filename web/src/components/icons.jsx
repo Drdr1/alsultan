@@ -3,7 +3,7 @@ import {
   WarningCircle, Warning, Archive as PArchive, ArrowRight as PArrowRight, Bell as PBell, BellRinging, CalendarCheck, CalendarBlank,
   Check as PCheck, CheckCircle, CaretLeft, ClipboardText, Clock as PClock, Receipt, House, SquaresFour, LockSimple, SignOut,
   MapPin as PMapPin, PencilSimpleLine, Phone as PPhone, Broadcast, MagnifyingGlass, ShieldCheck as PShieldCheck, Storefront,
-  HandCoins, UserPlus as PUserPlus, UsersThree, Wallet as PWallet, X as PX, Lightning, Moon as PMoon, Sun as PSun,
+  HandCoins, UserPlus as PUserPlus, UsersThree, Wallet as PWallet, X as PX, Lightning, Moon as PMoon, Sun as PSun, Export as PExport,
 } from '@phosphor-icons/react';
 
 const w = (C, weight = 'duotone') => (p) => <C weight={weight} {...p} />;
@@ -42,3 +42,5 @@ export const Zap = w(Lightning);
 
 export const Moon = w(PMoon);
 export const Sun = w(PSun);
+export const ShareIcon = w(PExport, 'bold');
+export const BellRingingIcon = w(BellRinging);

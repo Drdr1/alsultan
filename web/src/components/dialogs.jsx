@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from 'react';
 import { CalendarClock } from './icons.jsx';
 import { money, parseAmount, fmtDate, TERM_DAYS, DAY } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
-import { Dialog, Button, Input, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
+import { Dialog, Button, Input, MoneyInput, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
 
 const Ctx = createContext(() => {});
 export const useDialogs = () => useContext(Ctx);
@@ -26,7 +26,7 @@ function Context({ label, value, tone }) {
   </div>;
 }
 
-const AmountInput = (p) => <Input name="amount" inputMode="decimal" autoComplete="off" placeholder="0" className="h-14 text-center text-2xl font-bold tnum" required {...p} />;
+const AmountInput = (p) => <MoneyInput name="amount" placeholder="0" className="h-14 text-center text-2xl font-bold" required {...p} />;
 
 function CustomerPicker({ value, onChange, list, stats }) {
   return <Field label="العميل">
@@ -113,7 +113,7 @@ function AddCustomerDialog({ onClose }) {
         <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" /></Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="الرصيد الحالي (عليه كام)"><Input name="opening" inputMode="decimal" placeholder="0" className="tnum" /></Field>
+        <Field label="الرصيد الحالي (عليه كام)"><MoneyInput name="opening" placeholder="0" className="text-end" /></Field>
         <Field label="تاريخ أقدم فاتورة مفتوحة"><Input name="opening_date" type="date" defaultValue={today} min={minD} max={today} /></Field>
       </div>
       {dup && <p className="rounded-md bg-warning-soft px-3 py-2 text-[14px] text-warning">تنبيه: فيه عميل مسجل باسم "{dup.name}"{dup.phone ? ` (${dup.phone})` : ''}</p>}

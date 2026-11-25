@@ -45,6 +45,29 @@ export function Badge({ variant = 'default', dot, className, children }) {
 
 /* ---------- Form controls ---------- */
 export const Input = ({ className, ...p }) => <input className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring disabled:opacity-50', className)} {...p} />;
+/* Money input: shows thousands separators while typing (85645 -> 85,645). */
+export function groupDigits(raw) {
+  let t = String(raw ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫]/g, '.').replace(/[^0-9.]/g, '');
+  const dot = t.indexOf('.');
+  let int = dot === -1 ? t : t.slice(0, dot), frac = dot === -1 ? null : t.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+  int = int.replace(/^0+(?=\d)/, '');
+  const g = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac === null ? g : (g || '0') + '.' + frac;
+}
+export function MoneyInput({ value, defaultValue, onChange, className, ...p }) {
+  const [inner, setInner] = useState(() => groupDigits(defaultValue ?? ''));
+  const shown = value !== undefined ? groupDigits(value) : inner;
+  const handle = (e) => {
+    const el = e.target, caret = el.selectionStart ?? el.value.length;
+    const digitsBefore = el.value.slice(0, caret).replace(/[^0-9٠-٩.]/g, '').length;
+    const g = groupDigits(el.value);
+    if (value === undefined) setInner(g);
+    el.value = g; onChange?.(e);
+    requestAnimationFrame(() => { let i = 0, seen = 0; while (i < g.length && seen < digitsBefore) { if (g[i] !== ',') seen++; i++; } try { el.setSelectionRange(i, i); } catch { /* not focusable */ } });
+  };
+  return <Input {...p} type="text" inputMode="decimal" autoComplete="off" dir="ltr" value={shown} onChange={handle} className={cn('tnum', className)} />;
+}
+
 export const Textarea = ({ className, ...p }) => <textarea className={cn('flex min-h-[72px] w-full rounded-md border bg-card px-3 py-2 text-sm shadow-card placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring', className)} {...p} />;
 export const Select = ({ className, ...p }) => <select className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30', className)} {...p} />;
 export const Label = ({ className, ...p }) => <label className={cn('grid gap-1.5 text-[14px] font-medium', className)} {...p} />;

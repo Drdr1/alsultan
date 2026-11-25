@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Storefront } from '@phosphor-icons/react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun } from './icons.jsx';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging } from './icons.jsx';
 import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
+import { permission, enableNotifications, isIOS, isStandalone, canInstall, install, onPWAChange } from '../lib/notify.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, Select, cn } from './ui.jsx';
 
@@ -19,6 +20,31 @@ export function ThemeToggle({ className }) {
     try { localStorage.setItem('alsultan-theme', next ? 'dark' : 'light'); } catch (e) { /* storage blocked */ }
   };
   return <Button variant="outline" size="icon" className={className} onClick={flip} aria-label={dark ? 'الوضع الفاتح' : 'الوضع الليلي'} title={dark ? 'الوضع الفاتح' : 'الوضع الليلي'}>{dark ? <Sun /> : <Moon />}</Button>;
+}
+
+function NotifyPrompt() {
+  const [, force] = useState(0);
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('alsultan-notify-hide') === '1'; } catch { return false; } });
+  useEffect(() => onPWAChange(() => force((n) => n + 1)), []);
+  const hide = () => { setHidden(true); try { localStorage.setItem('alsultan-notify-hide', '1'); } catch { /* storage blocked */ } };
+  const perm = permission();
+  const iosBrowser = isIOS() && !isStandalone();
+  if (hidden || perm === 'granted' || (perm === 'unsupported' && !iosBrowser)) return null;
+  return <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4 shadow-card">
+    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"><BellRinging className="size-5" /></span>
+    <div className="min-w-0 flex-[1_1_240px] text-sm">
+      <div className="font-semibold">خلّي التنبيهات توصلك على الموبايل</div>
+      <div className="mt-0.5 text-muted-foreground">{iosBrowser
+        ? <>على الآيفون: دوس زرار المشاركة <ShareIcon className="inline size-4 align-text-bottom" /> تحت، واختار «إضافة إلى الشاشة الرئيسية»، وافتح دفتر السلطان من الأيقونة اللي هتظهر، وبعدها فعّل الإشعارات من هنا.</>
+        : perm === 'denied' ? 'الإشعارات مقفولة. افتح إعدادات المتصفح للموقع ده واسمح بالإشعارات.'
+        : 'هيوصلك تنبيه لما عميل يعدّي مدة الأجل أو يتسجل تحصيل جديد، حتى وانت فاتح حاجة تانية على الموبايل.'}</div>
+    </div>
+    <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:flex-1">
+      {canInstall() && <Button variant="outline" onClick={install}>تنزيل كأبلكيشن</Button>}
+      {!iosBrowser && perm === 'default' && <Button onClick={() => enableNotifications()}>تفعيل الإشعارات</Button>}
+      <Button variant="ghost" onClick={hide}>مش دلوقتي</Button>
+    </div>
+  </div>;
 }
 
 function AgencyPicker({ className }) {
@@ -57,7 +83,7 @@ function BellMenu() {
     {open && <div className="absolute end-0 top-11 z-40 w-[min(360px,calc(100vw-24px))] rounded-lg border bg-card shadow-pop animate-in">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="font-semibold">التنبيهات</div>
-        {'Notification' in window && Notification.permission === 'default' && <button className="text-xs font-medium text-brand hover:underline" onClick={() => Notification.requestPermission()}>تفعيل إشعارات المتصفح</button>}
+        {permission() === 'default' && <button className="text-xs font-medium text-brand hover:underline" onClick={() => enableNotifications()}>تفعيل الإشعارات</button>}
       </div>
       <div className="max-h-[60vh] overflow-auto p-2">
         {overdue.length ? overdue.slice(0, 30).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => { setOpen(false); go({ name: 'customer', id: c.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
@@ -121,6 +147,7 @@ export function Layout({ children }) {
       </header>
       <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1800px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
         <AgencyPicker className="md:hidden" />
+        {!stack.length && view.name === 'home' && <NotifyPrompt />}
         {children}
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
           {api?.mode === 'demo' ? <><span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-warning" />نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button className="font-medium text-foreground hover:underline" onClick={() => api.resetDemo()}>استرجاع البيانات التجريبية</button></>
