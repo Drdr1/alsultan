@@ -44,7 +44,7 @@ export function Badge({ variant = 'default', dot, className, children }) {
 }
 
 /* ---------- Form controls ---------- */
-export const Input = ({ className, ...p }) => <input className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring disabled:opacity-50', className)} {...p} />;
+export const Input = ({ className, ...p }) => <input className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-base sm:text-sm shadow-card transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring disabled:opacity-50', className)} {...p} />;
 /* Money input: shows thousands separators while typing (85645 -> 85,645). */
 export function groupDigits(raw) {
   let t = String(raw ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫]/g, '.').replace(/[^0-9.]/g, '');
@@ -68,8 +68,8 @@ export function MoneyInput({ value, defaultValue, onChange, className, ...p }) {
   return <Input {...p} type="text" inputMode="decimal" autoComplete="off" dir="ltr" value={shown} onChange={handle} className={cn('tnum', className)} />;
 }
 
-export const Textarea = ({ className, ...p }) => <textarea className={cn('flex min-h-[72px] w-full rounded-md border bg-card px-3 py-2 text-sm shadow-card placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring', className)} {...p} />;
-export const Select = ({ className, ...p }) => <select className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-sm shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30', className)} {...p} />;
+export const Textarea = ({ className, ...p }) => <textarea className={cn('flex min-h-[72px] w-full rounded-md border bg-card px-3 py-2 text-base sm:text-sm shadow-card placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring', className)} {...p} />;
+export const Select = ({ className, ...p }) => <select className={cn('flex h-9 w-full rounded-md border bg-card px-3 text-base sm:text-sm shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30', className)} {...p} />;
 export const Label = ({ className, ...p }) => <label className={cn('grid gap-1.5 text-[14px] font-medium', className)} {...p} />;
 export const Field = ({ label, hint, children }) => <Label>{label}{children}{hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}</Label>;
 

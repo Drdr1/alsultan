@@ -26,7 +26,7 @@ function Context({ label, value, tone }) {
   </div>;
 }
 
-const AmountInput = (p) => <MoneyInput name="amount" placeholder="0" className="h-14 text-center text-2xl font-bold" required {...p} />;
+const AmountInput = (p) => <MoneyInput name="amount" placeholder="0" className="h-14 text-center !text-2xl font-bold" required {...p} />;
 
 function CustomerPicker({ value, onChange, list, stats }) {
   return <Field label="العميل">
