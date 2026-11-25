@@ -24,8 +24,8 @@ export function ThemeToggle({ className }) {
 function AgencyPicker({ className }) {
   const { me, agencies, agency, setAgency } = useApp();
   if (me.role !== 'admin' || agencies.length === 0) return null;
-  return <Select aria-label="التوكيل" value={agency} onChange={(e) => setAgency(e.target.value)} className={cn('font-medium', agency !== 'all' && 'border-foreground/40', className)}>
-    <option value="all">كل التوكيلات</option>{agencies.map((a) => <option key={a.id} value={a.id}>توكيل {a.name}</option>)}
+  return <Select aria-label="التوكيل" value={agency} onChange={(e) => setAgency(e.target.value)} className={cn('font-medium border-foreground/40', className)}>
+    {agencies.map((a) => <option key={a.id} value={a.id}>توكيل {a.name}</option>)}
   </Select>;
 }
 

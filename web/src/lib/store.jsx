@@ -18,7 +18,8 @@ export function AppProvider({ children }) {
   const [stack, setStack] = useState([]);
   const [tick, setTick] = useState(0);
   const agencies = raw.agencies || [];
-  const activeAgency = me?.role === 'admin' && agency !== 'all' && agencies.some((a) => a.id === agency) ? agency : 'all';
+  // Admins always look at one agency at a time (no combined numbers across agencies).
+  const activeAgency = me?.role !== 'admin' || !agencies.length ? 'all' : (agencies.some((a) => a.id === agency) ? agency : agencies[0].id);
   // Admin can narrow every page to one agency: filter the data once, here.
   const data = useMemo(() => {
     if (activeAgency === 'all') return raw;
