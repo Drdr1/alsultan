@@ -80,7 +80,7 @@ function BellMenu() {
     <Button variant="outline" size="icon" aria-label="التنبيهات" onClick={() => setOpen((o) => !o)} className="relative">
       <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[12px] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
     </Button>
-    {open && <div className="absolute end-0 top-11 z-40 w-[min(360px,calc(100vw-24px))] rounded-lg border bg-card shadow-pop animate-in">
+    {open && <div className="z-40 rounded-lg border bg-card shadow-pop animate-in max-sm:fixed max-sm:inset-x-3 max-sm:top-[68px] sm:absolute sm:end-0 sm:top-11 sm:w-[360px]">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="font-semibold">التنبيهات</div>
         {permission() === 'default' && <button className="text-xs font-medium text-brand hover:underline" onClick={() => enableNotifications()}>تفعيل الإشعارات</button>}
@@ -88,7 +88,7 @@ function BellMenu() {
       <div className="max-h-[60vh] overflow-auto p-2">
         {overdue.length ? overdue.slice(0, 30).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => { setOpen(false); go({ name: 'customer', id: c.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-danger" />
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{c.name} تجاوز {TERM_DAYS} يوم</span><span className="block text-xs text-muted-foreground">عليه {money(s.balance)} ج.م · متأخر {s.overdueDays} يوم{me.role === 'admin' ? ' · ' + nameOf(c.rep_id) : ''}</span></span>
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{c.name}</span><span className="shrink-0 text-xs font-medium text-danger">متأخر {s.overdueDays} يوم</span></span><span className="block text-xs text-muted-foreground">عليه {money(s.balance)} ج.م{me.role === 'admin' ? ' · ' + nameOf(c.rep_id) : ''}</span></span>
         </button>; }) : <p className="p-6 text-center text-sm text-muted-foreground">لا توجد تنبيهات.</p>}
       </div>
     </div>}
