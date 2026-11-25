@@ -25,6 +25,7 @@ export const parseAmount = (s) => {
 export const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 export const KIND = { opening: 'رصيد افتتاحي', invoice: 'فاتورة آجل', collection: 'تحصيل', correction: 'تصحيح' };
 export const TYPE = { retail: 'قطاعي', wholesale: 'جملة' };
+export const REP_TYPE = { retail: 'مندوب قطاعي', wholesale: 'مندوب جملة' };
 
 /* ---------------- domain logic ---------------- */
 export function effect(t) {
@@ -82,10 +83,10 @@ export function demoSeed() {
   const profiles = [
     { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
     { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
-    { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, active: true, created_at: at(100) },
-    { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, active: true, created_at: at(100) },
-    { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, active: true, created_at: at(100) },
-    { id: 'u-youssef', username: 'youssef', full_name: 'يوسف رمضان', role: 'rep', credit_limit: 0, active: false, created_at: at(1) },
+    { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, rep_type: 'wholesale', active: true, created_at: at(100) },
+    { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, rep_type: 'retail', active: true, created_at: at(100) },
+    { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, rep_type: 'retail', active: true, created_at: at(100) },
+    { id: 'u-youssef', username: 'youssef', full_name: 'يوسف رمضان', role: 'rep', credit_limit: 0, rep_type: 'wholesale', active: false, created_at: at(1) },
   ];
   const passwords = Object.fromEntries(profiles.map((p) => [p.username, '1234']));
   // [rep, name, phone, location, type, weekly invoice, pay ratio]
@@ -115,7 +116,7 @@ export function demoSeed() {
   const round = (n) => Math.round(n / 50) * 50;
   shops.forEach(([rep, name, phone, location, type, weekly, ratio], i) => {
     const id = 'c-' + (i + 1);
-    customers.push({ id, rep_id: rep, name, phone, location, debt_type: type, created_at: at(84, 9), created_by: rep });
+    customers.push({ id, rep_id: rep, name, phone, location, debt_type: rep === 'u-ahmed' ? 'wholesale' : 'retail', created_at: at(84, 9), created_by: rep });
     const debts = [];
     const opening = round(weekly * (1.4 + rnd()));
     debts.push(opening);
@@ -138,7 +139,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v1';
+  const KEY = 'alsultan-demo-v2';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -205,10 +206,10 @@ export function DemoBackend() {
       setSession(p.id);
       return p;
     },
-    async signUp(username, password, fullName) {
+    async signUp(username, password, fullName, repType) {
       const u = String(username).trim().toLowerCase();
       if (db.profiles.some((x) => x.username === u)) throw new Error('اسم المستخدم ده موجود');
-      const p = { id: 'u-' + uid(), username: u, full_name: fullName, role: 'rep', credit_limit: 0, active: false, created_at: new Date().toISOString() };
+      const p = { id: 'u-' + uid(), username: u, full_name: fullName, role: 'rep', rep_type: repType, credit_limit: 0, active: false, created_at: new Date().toISOString() };
       db.profiles.push(p); db.passwords[u] = password;
       commit({ table: 'profiles', type: 'INSERT', row: p });
     },
@@ -218,8 +219,10 @@ export function DemoBackend() {
       if (m.role === 'admin') return structuredClone({ profiles: db.profiles, customers: db.customers, transactions: db.transactions });
       return structuredClone({ profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id) });
     },
-    async addCustomer({ name, phone, location, debt_type, opening, opening_date, rep_id }) {
+    async addCustomer({ name, phone, location, opening, opening_date, rep_id }) {
       const m = requireActive();
+      const owner = m.role === 'admin' && rep_id ? db.profiles.find((x) => x.id === rep_id) : m;
+      const debt_type = owner?.rep_type || 'retail';
       const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, created_at: new Date().toISOString(), created_by: m.id };
       db.customers.push(c);
       if (opening > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: opening, note: 'رصيد افتتاحي', occurred_at: opening_date });
@@ -269,8 +272,8 @@ export async function SupabaseBackend() {
       if (error) throw new Error('اسم المستخدم أو كلمة المرور غلط');
       return profileOf(data.user.id);
     },
-    async signUp(u, p, name) {
-      const { error } = await sb.auth.signUp({ email: email(u), password: p, options: { data: { username: u.trim().toLowerCase(), full_name: name } } });
+    async signUp(u, p, name, repType) {
+      const { error } = await sb.auth.signUp({ email: email(u), password: p, options: { data: { username: u.trim().toLowerCase(), full_name: name, rep_type: repType } } });
       if (error) throw new Error(/registered/i.test(error.message) ? 'اسم المستخدم ده موجود' : error.message);
       await sb.auth.signOut();
     },
@@ -280,7 +283,7 @@ export async function SupabaseBackend() {
       return { profiles, customers, transactions };
     },
     async addCustomer(c) {
-      const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: c.debt_type, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null });
+      const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null });
       fail(error); return data;
     },
     async addTransaction(t) {

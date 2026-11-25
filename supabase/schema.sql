@@ -26,6 +26,9 @@ create table if not exists public.profiles (
   active        boolean not null default false,
   created_at    timestamptz not null default now()
 );
+-- Each rep sells either retail (قطاعي) or wholesale (جملة) only; chosen at sign-up.
+alter table public.profiles add column if not exists rep_type text
+  check (rep_type in ('retail','wholesale'));
 
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
@@ -36,11 +39,12 @@ $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, username, full_name)
+  insert into public.profiles (id, username, full_name, rep_type)
   values (
     new.id,
     lower(coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))),
-    coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), split_part(new.email, '@', 1))
+    coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), split_part(new.email, '@', 1)),
+    case when new.raw_user_meta_data->>'rep_type' in ('retail','wholesale') then new.raw_user_meta_data->>'rep_type' end
   );
   return new;
 end $$;
@@ -72,8 +76,8 @@ begin
   end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('profile', old.id::text, 'update', jsonb_build_object(
-    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name),
-    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name)));
+    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type),
+    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name, 'rep_type', new.rep_type)));
   return new;
 end $$;
 
@@ -105,6 +109,8 @@ begin
   if me.role <> 'admin' then
     new.rep_id := me.id;
   end if;
+  -- the customer's type always follows the rep who owns it
+  new.debt_type := coalesce((select rep_type from public.profiles where id = new.rep_id), 'retail');
   new.created_by := me.id;
   new.created_at := now();
   return new;
@@ -261,7 +267,7 @@ create trigger customers_no_delete before delete on public.customers for each ro
 drop trigger if exists profiles_no_delete on public.profiles;
 create trigger profiles_no_delete before delete on public.profiles for each row execute function public.block_delete();
 
--- Add customer + opening balance in one call
+-- Add customer + opening balance in one call (p_debt_type is ignored: the type follows the rep)
 create or replace function public.add_customer(
   p_name text, p_phone text, p_location text, p_debt_type text,
   p_opening numeric, p_opening_date timestamptz, p_rep_id uuid default null

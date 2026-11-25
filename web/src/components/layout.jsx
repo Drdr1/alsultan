@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Storefront } from '@phosphor-icons/react';
 import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun } from './icons.jsx';
-import { TERM_DAYS, money } from '../lib/core.js';
+import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, cn } from './ui.jsx';
 
@@ -92,7 +92,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? 'مدير' : 'مندوب مبيعات'}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? 'مدير' : (REP_TYPE[me.rep_type] || 'مندوب مبيعات')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>
@@ -110,7 +110,7 @@ export function Layout({ children }) {
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
-      <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1280px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
+      <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1800px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
         {children}
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
           {api?.mode === 'demo' ? <><span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-warning" />نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button className="font-medium text-foreground hover:underline" onClick={() => api.resetDemo()}>استرجاع البيانات التجريبية</button></>

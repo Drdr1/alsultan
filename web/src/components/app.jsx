@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search, Store, Wallet, ChevronLeft, AlertTriangle } from './icons.jsx';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
-import { money, TERM_DAYS, TYPE, DAY, startOfDay } from '../lib/core.js';
+import { money, TERM_DAYS, TYPE, REP_TYPE, DAY, startOfDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Badge, Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Segmented, Table, THead, TBody, TR, TH, TD, Button, Avatar, Empty, Progress, cn } from './ui.jsx';
 
@@ -33,12 +33,13 @@ export function StatCard({ icon: Icon, label, value, sub, tone = 'default' }) {
 
 /* customers table with search + type filter */
 export function CustomerTable({ list, showRep = false, onCollect, initialQuery = '', emptyText }) {
-  const { stats, go, nameOf } = useApp();
+  const { stats, go, nameOf, data } = useApp();
   const [q, setQ] = useState(initialQuery);
+  const repType = (id) => data.profiles.find((p) => p.id === id)?.rep_type;
   const [type, setType] = useState('all');
   const rows = useMemo(() => {
     let r = list.filter((c) => !q.trim() || c.name.includes(q.trim()) || (c.phone || '').includes(q.trim()) || (c.location || '').includes(q.trim()));
-    if (type !== 'all') r = r.filter((c) => c.debt_type === type);
+    if (showRep && type !== 'all') r = r.filter((c) => repType(c.rep_id) === type);
     return r.sort((a, b) => (stats.get(b.id).overdue - stats.get(a.id).overdue) || (stats.get(b.id).balance - stats.get(a.id).balance));
   }, [list, q, type, stats]);
   return <div className="grid gap-4">
@@ -47,18 +48,17 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو التليفون أو المنطقة" className="ps-9" type="search" />
       </div>
-      <Segmented value={type} onChange={setType} options={[['all', 'الكل'], ['retail', 'قطاعي'], ['wholesale', 'جملة']]} />
+      {showRep && <Segmented value={type} onChange={setType} options={[['all', 'كل المناديب'], ['retail', 'مناديب القطاعي'], ['wholesale', 'مناديب الجملة']]} />}
     </div>
     {rows.length === 0 ? <Empty icon={Store} title={list.length ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}>{list.length ? 'جرّب كلمة بحث تانية.' : emptyText}</Empty> : <>
       {/* desktop table */}
       <div className="hidden border-t md:block">
         <Table>
-          <THead><TR className="bg-muted/40 hover:bg-muted/40"><TH>العميل</TH>{showRep && <TH>المندوب</TH>}<TH>النوع</TH><TH className="text-end">الرصيد المستحق</TH><TH className="text-end">تحصيل الشهر</TH><TH>حالة الأجل</TH><TH className="w-0" /></TR></THead>
+          <THead><TR className="bg-muted/40 hover:bg-muted/40"><TH>العميل</TH>{showRep && <TH>المندوب</TH>}<TH className="text-end">الرصيد المستحق</TH><TH className="text-end">تحصيل الشهر</TH><TH>حالة الأجل</TH><TH className="w-0" /></TR></THead>
           <TBody>{rows.map((c) => { const s = stats.get(c.id); return (
             <TR key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className={cn('cursor-pointer', s.overdue ? 'bg-danger-soft/60 hover:bg-danger-soft' : 'hover:bg-muted/50')}>
               <TD><div className="flex items-center gap-3"><Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'default'} /><div className="min-w-0"><div className={cn('font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="text-xs text-muted-foreground">{c.location}{c.phone && <> · <span dir="ltr">{c.phone}</span></>}</div></div></div></TD>
-              {showRep && <TD className="text-muted-foreground">{nameOf(c.rep_id)}</TD>}
-              <TD><Badge variant="outline">{TYPE[c.debt_type]}</Badge></TD>
+              {showRep && <TD className="text-muted-foreground"><div>{nameOf(c.rep_id)}</div><div className="text-xs">{TYPE[repType(c.rep_id)]}</div></TD>}
               <TD className={cn('text-end font-semibold tnum', s.overdue && 'text-danger')}>{money(s.balance)}</TD>
               <TD className="text-end tnum text-muted-foreground">{s.monthCollected ? money(s.monthCollected) : '—'}</TD>
               <TD><div className="flex flex-wrap gap-1.5"><DueBadge s={s} />{s.pending > 0 && <Badge variant="warning">تصحيح معلق</Badge>}</div></TD>
@@ -107,8 +107,8 @@ export function CreditCard({ sum, title = 'حد الائتمان', children }) {
       </div>
       <div className="mt-5 grid grid-cols-3 divide-x divide-x-reverse rounded-md border bg-muted/30 text-center">
         <div className="p-3"><div className="text-xs text-muted-foreground">{sum.over ? 'التجاوز' : 'المتاح'}</div><div className={cn('tnum mt-0.5 font-semibold', sum.over ? 'text-danger' : 'text-success')}>{money(Math.abs(sum.limit - sum.total))}</div></div>
-        <div className="p-3"><div className="text-xs text-muted-foreground">قطاعي</div><div className="tnum mt-0.5 font-semibold">{money(sum.retail)}</div></div>
-        <div className="p-3"><div className="text-xs text-muted-foreground">جملة</div><div className="tnum mt-0.5 font-semibold">{money(sum.wholesale)}</div></div>
+        <div className="p-3"><div className="text-xs text-muted-foreground">العملاء</div><div className="tnum mt-0.5 font-semibold">{sum.customers.length}</div></div>
+        <div className="p-3"><div className="text-xs text-muted-foreground">متأخرين</div><div className={cn('tnum mt-0.5 font-semibold', sum.overdue > 0 && 'text-danger')}>{sum.overdue}</div></div>
       </div>
       {children}
     </CardContent>
@@ -191,7 +191,7 @@ export function RepCard({ r, s, onClick }) {
   return <button onClick={onClick} className={cn('group grid gap-4 rounded-lg border bg-card p-5 text-start shadow-card transition-colors hover:border-foreground/20', s.over && 'border-danger/40')}>
     <div className="flex items-center gap-3">
       <Avatar name={r.full_name.charAt(0)} tone={s.over ? 'danger' : 'brand'} />
-      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground" dir="ltr">@{r.username}</div></div>
+      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground">{REP_TYPE[r.rep_type] || 'مندوب'} · <span dir="ltr">@{r.username}</span></div></div>
       {s.over ? <Badge variant="solid">موقوف</Badge> : <Badge variant={lv === 'warning' ? 'warning' : 'success'} dot>{lv === 'warning' ? 'قريب من الحد' : 'نشط'}</Badge>}
     </div>
     <div>

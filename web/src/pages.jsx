@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search } from './components/icons.jsx';
-import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
+import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, REP_TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs } from './components/dialogs.jsx';
 import { Logo, ThemeToggle } from './components/layout.jsx';
@@ -79,7 +79,7 @@ export function AdminHome() {
       <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:h-10 [&>button]:max-sm:flex-1">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
     </div>}
     <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-      <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={`${sums.length} مندوب نشط`} tone="brand" />
+      <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={`قطاعي ${money(sums.filter(({ r }) => r.rep_type !== 'wholesale').reduce((a, { s }) => a + s.total, 0))} · جملة ${money(sums.filter(({ r }) => r.rep_type === 'wholesale').reduce((a, { s }) => a + s.total, 0))}`} tone="brand" />
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Lock} label="مناديب تجاوزوا الحد" value={stopped} sub={stopped ? 'موقوفين عن البيع الآجل' : 'الكل داخل الحد'} tone={stopped ? 'danger' : 'default'} />
       <StatCard icon={AlertTriangle} label="عملاء متأخرين" value={overdue.length} sub={`بإجمالي ${money(overdueAmt)} ج.م`} tone={overdue.length ? 'danger' : 'default'} />
@@ -161,11 +161,12 @@ function ActivateRow({ r }) {
   const { api, toast } = useApp();
   const { busy, error, submit } = useSubmit(async (fd) => {
     const limit = parseAmount(fd.get('limit')); if (!(limit > 0)) throw new Error('اكتب حد الائتمان بالأرقام');
-    await api.updateProfile(r.id, { credit_limit: limit, active: true }); toast(`تم تفعيل حساب ${r.full_name}`);
+    await api.updateProfile(r.id, { credit_limit: limit, rep_type: fd.get('rep_type'), active: true }); toast(`تم تفعيل حساب ${r.full_name}`);
   });
   return <form onSubmit={submit} className="grid gap-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-end gap-4">
       <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
+      <div className="max-sm:w-full"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'} className="w-full sm:w-36"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div>
       <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-full tnum sm:w-48" /></Field></div>
       <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button>
     </div>
@@ -186,7 +187,7 @@ export function RepDetail({ id }) {
   const [confirmStop, setConfirmStop] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => {
     const limit = parseAmount(fd.get('limit')); if (!(limit >= 0)) throw new Error('اكتب حد الائتمان بالأرقام');
-    await api.updateProfile(id, { credit_limit: limit }); toast('تم حفظ حد الائتمان الجديد');
+    await api.updateProfile(id, { credit_limit: limit, rep_type: fd.get('rep_type') }); toast('تم حفظ بيانات المندوب');
   });
   if (!r) return <Card><Empty title="المندوب غير موجود" /></Card>;
   const s = summaryOf(r);
@@ -198,9 +199,9 @@ export function RepDetail({ id }) {
       <StatCard icon={ShieldCheck} label="حالة الحساب" value={s.over ? 'موقوف' : 'نشط'} sub={s.over ? 'تجاوز حد الائتمان' : 'داخل الحد'} tone={s.over ? 'danger' : 'success'} />
     </div>
     <div className="grid gap-6 xl:grid-cols-5">
-      <div className="xl:col-span-2"><CreditCard sum={s} title={`حد ائتمان ${r.full_name}`}>
+      <div className="xl:col-span-2"><CreditCard sum={s} title={`${r.full_name} · ${REP_TYPE[r.rep_type] || 'مندوب'}`}>
         <form onSubmit={submit} className="mt-5 grid gap-2 border-t pt-4">
-          <div className="flex items-end gap-2"><Field label="تعديل حد الائتمان"><Input name="limit" inputMode="decimal" defaultValue={money(r.credit_limit)} className="tnum" /></Field><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
+          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><Input name="limit" inputMode="decimal" defaultValue={money(r.credit_limit)} className="tnum" /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
           <FormError>{error}</FormError>
         </form>
         <div className="mt-4 border-t pt-4">{confirmStop ? <div className="flex flex-wrap items-center gap-2 text-sm"><span className="flex-1">إيقاف الحساب يمنع المندوب من الدخول. متأكد؟</span><Button size="sm" variant="danger" onClick={async () => { await api.updateProfile(id, { active: false }); toast('تم إيقاف حساب ' + r.full_name); back(); }}>إيقاف</Button><Button size="sm" variant="outline" onClick={() => setConfirmStop(false)}>إلغاء</Button></div>
@@ -239,7 +240,7 @@ export function CustomerPage({ id }) {
       <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-5">
         <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
         <div className="min-w-0 flex-[1_1_240px]">
-          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><Badge variant="outline">{TYPE[c.debt_type]}</Badge><DueBadge s={s} /></div>
+          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><DueBadge s={s} /></div>
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted-foreground">
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}
             {c.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{c.location}</span>}
@@ -332,7 +333,7 @@ export function LoginPage() {
   const [tab, setTab] = useState('login');
   const [done, setDone] = useState('');
   const login = useSubmit(async (fd) => signIn(fd.get('username'), fd.get('password')));
-  const signup = useSubmit(async (fd) => { await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim()); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
+  const signup = useSubmit(async (fd) => { if (!fd.get('rep_type')) throw new Error('اختار نوع المندوب: قطاعي ولا جملة'); await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim(), String(fd.get('rep_type'))); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
   return <AuthShell>
     <div className="flex items-center gap-3 lg:hidden"><Logo /><span className="font-bold">السلطان للتوزيع</span></div>
     <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
@@ -344,6 +345,9 @@ export function LoginPage() {
       <Button type="submit" size="lg" disabled={login.busy}>دخول</Button>
     </form> : <form onSubmit={signup.submit} className="grid gap-4">
       <Field label="الاسم بالكامل"><Input name="full_name" required /></Field>
+      <div className="grid gap-1.5 text-[14px] font-medium"><span>نوع المندوب</span>
+        <div className="grid grid-cols-2 gap-2">{[['retail', 'قطاعي', 'محلات وأكشاك'], ['wholesale', 'جملة', 'تجار ومخازن']].map(([v, l, h]) => <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded-md border bg-card p-3 shadow-card has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-foreground"><input type="radio" name="rep_type" value={v} required className="accent-current" /><span><span className="block font-semibold">{l}</span><span className="block text-xs font-normal text-muted-foreground">{h}</span></span></label>)}</div>
+      </div>
       <Field label="اسم المستخدم" hint="حروف إنجليزية أو أرقام، 3 على الأقل"><Input name="username" dir="ltr" pattern="[A-Za-z0-9_.\-]{3,30}" required /></Field>
       <Field label="كلمة المرور"><Input name="password" type="password" dir="ltr" minLength={6} required /></Field>
       <FormError>{signup.error}</FormError>

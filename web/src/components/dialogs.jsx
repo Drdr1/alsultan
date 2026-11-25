@@ -102,7 +102,7 @@ function AddCustomerDialog({ onClose }) {
     const opening = fd.get('opening') ? parseAmount(fd.get('opening')) : 0;
     if (!(opening >= 0)) throw new Error('الرصيد لازم يكون رقم');
     const d = fd.get('opening_date');
-    await api.addCustomer({ name: n, phone: fd.get('phone'), location: fd.get('location'), debt_type: fd.get('debt_type'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
+    await api.addCustomer({ name: n, phone: fd.get('phone'), location: fd.get('location'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
     toast(`تمت إضافة ${n}`);
   }, onClose);
   return <Dialog open onClose={onClose} title="إضافة عميل جديد" description="سجّل بيانات المحل والمبلغ اللي عليه دلوقتي." width="max-w-lg">
@@ -110,9 +110,8 @@ function AddCustomerDialog({ onClose }) {
       <Field label="اسم العميل / المحل"><Input name="name" value={name} onChange={(e) => setName(e.target.value)} required /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="رقم التليفون"><Input name="phone" inputMode="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
-        <Field label="نوع المديونية"><Select name="debt_type"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field>
+        <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" /></Field>
       </div>
-      <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="الرصيد الحالي (عليه كام)"><Input name="opening" inputMode="decimal" placeholder="0" className="tnum" /></Field>
         <Field label="تاريخ أقدم فاتورة مفتوحة"><Input name="opening_date" type="date" defaultValue={today} min={minD} max={today} /></Field>
