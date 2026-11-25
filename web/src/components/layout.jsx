@@ -78,7 +78,7 @@ function BellMenu() {
   useEffect(() => { const h = (e) => !ref.current?.contains(e.target) && setOpen(false); document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
   return <div className="relative" ref={ref}>
     <Button variant="outline" size="icon" aria-label="التنبيهات" onClick={() => setOpen((o) => !o)} className="relative">
-      <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[12px] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
+      <Bell />{overdue.length > 0 && <span className="absolute -end-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[0.75rem] font-bold text-white ring-2 ring-background">{overdue.length}</span>}
     </Button>
     {open && <div className="z-40 rounded-lg border bg-card shadow-pop animate-in max-sm:fixed max-sm:inset-x-3 max-sm:top-[68px] sm:absolute sm:end-0 sm:top-11 sm:w-[360px]">
       <div className="flex items-center justify-between border-b px-4 py-3">
@@ -158,9 +158,9 @@ export function Layout({ children }) {
 
     {/* mobile bottom nav */}
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[12px]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+      {items.map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
         <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
-        {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
+        {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
       </button>)}
     </nav>
   </div>;

@@ -34,7 +34,7 @@ export function RepHome() {
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-danger text-white"><Lock className="size-4" /></span>
       <div><div className="font-semibold text-danger">تم إيقاف البيع الآجل</div><p className="mt-0.5 text-sm text-foreground/80">مديونيتك {money(sum.total)} ج.م تجاوزت حد الائتمان ({money(sum.limit)}) بمبلغ {money(sum.total - sum.limit)} ج.م. التحصيل متاح، وبمجرد ما المديونية تنزل تحت الحد هتقدر تسجل فواتير تاني.</p></div>
     </div>}
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(sum.month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Store} label="العملاء" value={sum.customers.length} sub="عميل مسجل" />
       <StatCard icon={AlertTriangle} label="عملاء متأخرين" value={overdue} sub={`تجاوزوا ${TERM_DAYS} يوم`} tone={overdue ? 'danger' : 'default'} />
@@ -80,7 +80,7 @@ export function AdminHome() {
       <div className="min-w-0 flex-[1_1_220px] text-sm"><span className="font-semibold">مطلوب مراجعتك: </span>{[pendTx ? `${pendTx} طلب تصحيح` : '', pendAcc ? `${pendAcc} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</div>
       <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:h-10 [&>button]:max-sm:flex-1">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
     </div>}
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={totalSub} tone="brand" />
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Lock} label="مناديب تجاوزوا الحد" value={stopped} sub={stopped ? 'موقوفين عن البيع الآجل' : 'الكل داخل الحد'} tone={stopped ? 'danger' : 'default'} />
@@ -91,7 +91,7 @@ export function AdminHome() {
       <RepBarsCard sums={sums.slice().sort((a, b) => b.s.total - a.s.total)} onOpen={(id) => go({ name: 'rep', id })} />
     </div>
     <div>
-      <div className="mb-3 flex items-center justify-between"><h3 className="text-[15px] font-semibold">المناديب</h3><Button variant="ghost" size="sm" onClick={() => nav('reps')}>عرض الكل<ChevronLeft /></Button></div>
+      <div className="mb-3 flex items-center justify-between"><h3 className="text-[0.9375rem] font-semibold">المناديب</h3><Button variant="ghost" size="sm" onClick={() => nav('reps')}>عرض الكل<ChevronLeft /></Button></div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sums.sort((a, b) => b.s.pct - a.s.pct).map(({ r, s }) => <RepCard key={r.id} r={r} s={s} onClick={() => go({ name: 'rep', id: r.id })} />)}</div>
     </div>
     <div className="grid gap-6 xl:grid-cols-2">
@@ -221,7 +221,7 @@ export function RepDetail({ id }) {
   if (!r) return <Card><Empty title="المندوب غير موجود" /></Card>;
   const s = summaryOf(r);
   return <>
-    <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(s.month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Store} label="العملاء" value={s.customers.length} />
       <StatCard icon={AlertTriangle} label="عملاء متأخرين" value={s.overdue} tone={s.overdue ? 'danger' : 'default'} />
@@ -270,7 +270,7 @@ export function CustomerPage({ id }) {
         <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
         <div className="min-w-0 flex-[1_1_240px]">
           <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><DueBadge s={s} /></div>
-          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted-foreground">
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[0.875rem] text-muted-foreground">
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}
             {c.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{c.location}</span>}
             {!isRep && <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" />{nameOf(c.rep_id)}</span>}
@@ -306,7 +306,7 @@ export function CustomerPage({ id }) {
             </div>
             <div className="shrink-0 text-end">
               <div dir="ltr" className={cn('tnum text-sm font-semibold', e < 0 ? 'text-success' : '', off && 'line-through')}>{e < 0 ? '−' : '+'}{money(Math.abs(e))}</div>
-              <div className="tnum text-[12px] text-muted-foreground">الرصيد {off ? '—' : money(run)}</div>
+              <div className="tnum text-[0.75rem] text-muted-foreground">الرصيد {off ? '—' : money(run)}</div>
             </div>
           </li>); })}</ul>
         <div className="border-t max-md:hidden">
@@ -329,8 +329,8 @@ export function CustomerPage({ id }) {
         <CardHeader><div><CardTitle>الأرشيف الشهري</CardTitle><CardDescription>محفوظ دائماً ولا يُحذف</CardDescription></div></CardHeader>
         <CardContent className="grid gap-1">{byMonth.map((m) => <button key={m.k} onClick={() => setMonth(m.k === month ? 'all' : m.k)} className={cn('grid grid-cols-[1fr_auto_auto] items-center gap-4 rounded-md px-3 py-2.5 text-start text-sm', month === m.k ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted/60')}>
           <span className="font-medium">{monthLabel(m.k)}</span>
-          <span className="text-end"><span className="block text-[12px] text-muted-foreground">مدين</span><span className="tnum">{money(m.debit)}</span></span>
-          <span className="text-end"><span className="block text-[12px] text-muted-foreground">محصّل</span><span className="tnum text-success">{money(m.credit)}</span></span>
+          <span className="text-end"><span className="block text-[0.75rem] text-muted-foreground">مدين</span><span className="tnum">{money(m.debit)}</span></span>
+          <span className="text-end"><span className="block text-[0.75rem] text-muted-foreground">محصّل</span><span className="tnum text-success">{money(m.credit)}</span></span>
         </button>)}</CardContent>
       </Card>
     </div>
@@ -368,7 +368,7 @@ export function LoginPage() {
   return <AuthShell>
     <div className="flex items-center gap-3 lg:hidden"><Logo /><span className="font-bold">السلطان للتوزيع</span></div>
     <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
-    {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[14px] text-success">{done}</div>}
+    {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[0.875rem] text-success">{done}</div>}
     {tab === 'login' ? <form onSubmit={login.submit} className="grid gap-4">
       <Field label="اسم المستخدم"><Input name="username" autoComplete="username" dir="ltr" required /></Field>
       <Field label="كلمة المرور"><Input name="password" type="password" autoComplete="current-password" dir="ltr" required /></Field>
@@ -377,7 +377,7 @@ export function LoginPage() {
     </form> : <form onSubmit={signup.submit} className="grid gap-4">
       <Field label="الاسم بالكامل"><Input name="full_name" required /></Field>
       {ags.length > 0 && <Field label="التوكيل"><Select name="agency_id" defaultValue="" required><option value="" disabled>اختار التوكيل…</option>{ags.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
-      <div className="grid gap-1.5 text-[14px] font-medium"><span>نوع المندوب</span>
+      <div className="grid gap-1.5 text-[0.875rem] font-medium"><span>نوع المندوب</span>
         <div className="grid grid-cols-2 gap-2">{[['retail', 'قطاعي', 'محلات وأكشاك'], ['wholesale', 'جملة', 'تجار ومخازن']].map(([v, l, h]) => <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded-md border bg-card p-3 shadow-card has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-foreground"><input type="radio" name="rep_type" value={v} required className="accent-current" /><span><span className="block font-semibold">{l}</span><span className="block text-xs font-normal text-muted-foreground">{h}</span></span></label>)}</div>
       </div>
       <Field label="اسم المستخدم" hint="حروف إنجليزية أو أرقام، 3 على الأقل"><Input name="username" dir="ltr" pattern="[A-Za-z0-9_.\-]{3,30}" required /></Field>
@@ -390,7 +390,7 @@ export function LoginPage() {
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
         {[['sayed', 'سيد', 'مدير'], ['mohamed', 'محمد', 'مدير'], ['ahmed', 'أحمد', 'حد 1,000,000'], ['mahmoud', 'محمود', 'حد 500,000'], ['karim', 'كريم', 'حد 200,000 · موقوف']].map(([u, n, l]) =>
-          <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[12px] text-muted-foreground">{l}</span></span></button>)}
+          <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
   </AuthShell>;

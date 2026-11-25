@@ -15,7 +15,7 @@ export default {
         warning: { DEFAULT: v('warning'), soft: v('warning-soft') },
         sidebar: v('sidebar'),
       },
-      fontSize: { xs: ['14px', '20px'], sm: ['15px', '22px'] },
+      fontSize: { xs: ['0.875rem', '1.25rem'], sm: ['0.9375rem', '1.375rem'] },
       borderRadius: { lg: '10px', md: '8px', sm: '6px' },
       boxShadow: { card: '0 1px 2px 0 rgb(0 0 0 / 0.04)', pop: '0 16px 48px -12px rgb(0 0 0 / 0.25)' },
       keyframes: { in: { from: { opacity: 0, transform: 'translateY(6px) scale(.98)' } }, fade: { from: { opacity: 0 } } },

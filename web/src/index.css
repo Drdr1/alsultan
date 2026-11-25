@@ -45,11 +45,13 @@
 }
 
 html, body, #root { height: 100%; }
-body { @apply bg-background text-foreground font-sans antialiased; font-size: 15px; direction: rtl; }
+body { @apply bg-background text-foreground font-sans antialiased; font-size: 0.9375rem; direction: rtl; }
+/* Desktop only: everything (text + spacing, all in rem) a bit larger. Phones keep 16px. */
+@media (min-width: 1024px) { html { font-size: 18px; } }
 * { @apply border-border; }
 .tnum { font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 13px; }
+.recharts-text { font-family: "IBM Plex Sans Arabic", sans-serif; fill: hsl(var(--muted-foreground)); font-size: 0.8125rem; }
 .recharts-cartesian-grid line { stroke: var(--chart-grid); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
