@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search } from './components/icons.jsx';
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, REP_TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
@@ -58,12 +58,14 @@ function useSums() {
 }
 
 export function AdminHome() {
-  const { me, data, overdue, stats, go, nav, nameOf, reps } = useApp();
+  const { me, data, raw, overdue, stats, go, nav, nameOf, reps, agencies, agency } = useApp();
   const sums = useSums();
+  const sumWhere = (f) => money(sums.filter(({ r }) => f(r)).reduce((a, { s }) => a + s.total, 0));
+  const totalSub = agency === 'all' && agencies.length > 1 ? agencies.filter((a) => sums.some(({ r }) => r.agency_id === a.id)).map((a) => `${a.name} ${sumWhere((r) => r.agency_id === a.id)}`).join(' · ') : `قطاعي ${sumWhere((r) => r.rep_type !== 'wholesale')} · جملة ${sumWhere((r) => r.rep_type === 'wholesale')}`;
   const total = sums.reduce((a, x) => a + x.s.total, 0), month = sums.reduce((a, x) => a + x.s.month, 0);
   const stopped = sums.filter((x) => x.s.over).length;
   const overdueAmt = overdue.reduce((a, c) => a + stats.get(c.id).balance, 0);
-  const pendTx = data.transactions.filter((t) => t.status === 'pending').length, pendAcc = reps.filter((r) => !r.active).length;
+  const pendTx = data.transactions.filter((t) => t.status === 'pending').length, pendAcc = raw.profiles.filter((r) => r.role === 'rep' && !r.active).length;
   const recent = data.transactions.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, 6);
   const [q, setQ] = useState('');
   return <>
@@ -79,7 +81,7 @@ export function AdminHome() {
       <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:h-10 [&>button]:max-sm:flex-1">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
     </div>}
     <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-      <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={`قطاعي ${money(sums.filter(({ r }) => r.rep_type !== 'wholesale').reduce((a, { s }) => a + s.total, 0))} · جملة ${money(sums.filter(({ r }) => r.rep_type === 'wholesale').reduce((a, { s }) => a + s.total, 0))}`} tone="brand" />
+      <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={totalSub} tone="brand" />
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Lock} label="مناديب تجاوزوا الحد" value={stopped} sub={stopped ? 'موقوفين عن البيع الآجل' : 'الكل داخل الحد'} tone={stopped ? 'danger' : 'default'} />
       <StatCard icon={AlertTriangle} label="عملاء متأخرين" value={overdue.length} sub={`بإجمالي ${money(overdueAmt)} ج.م`} tone={overdue.length ? 'danger' : 'default'} />
@@ -110,11 +112,37 @@ export function AdminHome() {
   </>;
 }
 
+function AgenciesCard() {
+  const { api, raw, agencies, agency, setAgency, toast } = useApp();
+  const [adding, setAdding] = useState(false);
+  const { busy, error, submit } = useSubmit(async (fd) => { const a = await api.addAgency(fd.get('name')); toast(`تمت إضافة توكيل ${a.name}`); setAdding(false); });
+  const count = (id) => raw.profiles.filter((p) => p.role === 'rep' && p.active && p.agency_id === id).length;
+  return <Card>
+    <CardHeader><div><CardTitle>التوكيلات</CardTitle><CardDescription>كل مندوب تبع توكيل واحد. اختار توكيل لعرض مناديبه وعملائه بس.</CardDescription></div>
+      {!adding && <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Store />توكيل جديد</Button>}</CardHeader>
+    <CardContent className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        {[{ id: 'all', name: 'كل التوكيلات', n: raw.profiles.filter((p) => p.role === 'rep' && p.active).length }, ...agencies.map((a) => ({ ...a, n: count(a.id) }))].map((a) =>
+          <button key={a.id} onClick={() => setAgency(a.id)} className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors', agency === a.id ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-muted')}>
+            <span className="font-medium">{a.name}</span><span className={cn('tnum text-xs', agency === a.id ? 'opacity-70' : 'text-muted-foreground')}>{a.n} مندوب</span></button>)}
+      </div>
+      {adding && <form onSubmit={submit} className="grid gap-2 rounded-md border bg-muted/30 p-3">
+        <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_200px]"><Field label="اسم التوكيل"><Input name="name" placeholder="مثلاً: جهينة" autoFocus /></Field></div>
+          <Button type="submit" disabled={busy}><Check />إضافة</Button><Button type="button" variant="ghost" onClick={() => setAdding(false)}>إلغاء</Button></div>
+        <FormError>{error}</FormError>
+      </form>}
+    </CardContent>
+  </Card>;
+}
+
 export function RepsPage() {
   const { go } = useApp();
   const sums = useSums().sort((a, b) => b.s.pct - a.s.pct);
-  return sums.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sums.map(({ r, s }) => <RepCard key={r.id} r={r} s={s} onClick={() => go({ name: 'rep', id: r.id })} />)}</div>
-    : <Card><Empty icon={Users} title="لا يوجد مناديب مفعّلين بعد">فعّل حسابات المناديب من صفحة الحسابات الجديدة.</Empty></Card>;
+  return <>
+    <AgenciesCard />
+    {sums.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sums.map(({ r, s }) => <RepCard key={r.id} r={r} s={s} onClick={() => go({ name: 'rep', id: r.id })} />)}</div>
+      : <Card><Empty icon={Users} title="لا يوجد مناديب مفعّلين">فعّل حسابات المناديب من صفحة الحسابات الجديدة، أو اختار توكيل تاني.</Empty></Card>}
+  </>;
 }
 
 export function CustomersPage() {
@@ -158,15 +186,16 @@ export function ApprovalsPage() {
 }
 
 function ActivateRow({ r }) {
-  const { api, toast } = useApp();
+  const { api, toast, agencies } = useApp();
   const { busy, error, submit } = useSubmit(async (fd) => {
     const limit = parseAmount(fd.get('limit')); if (!(limit > 0)) throw new Error('اكتب حد الائتمان بالأرقام');
-    await api.updateProfile(r.id, { credit_limit: limit, rep_type: fd.get('rep_type'), active: true }); toast(`تم تفعيل حساب ${r.full_name}`);
+    await api.updateProfile(r.id, { credit_limit: limit, rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null, active: true }); toast(`تم تفعيل حساب ${r.full_name}`);
   });
   return <form onSubmit={submit} className="grid gap-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-end gap-4">
       <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
       <div className="max-sm:w-full"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'} className="w-full sm:w-36"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div>
+      <div className="max-sm:w-full"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || ''} className="w-full sm:w-40"><option value="">بدون توكيل</option>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div>
       <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><Input name="limit" inputMode="decimal" placeholder="500,000" className="w-full tnum sm:w-48" /></Field></div>
       <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button>
     </div>
@@ -175,19 +204,19 @@ function ActivateRow({ r }) {
 }
 
 export function AccountsPage() {
-  const { reps } = useApp();
-  const list = reps.filter((r) => !r.active);
+  const { raw } = useApp();
+  const list = raw.profiles.filter((r) => r.role === 'rep' && !r.active);
   return <Card><CardHeader><div><CardTitle>حسابات بانتظار التفعيل</CardTitle><CardDescription>حدد حد الائتمان لكل مندوب ثم فعّل الحساب.</CardDescription></div></CardHeader>
     <CardContent className="grid gap-3">{list.length ? list.map((r) => <ActivateRow key={r.id} r={r} />) : <Empty icon={UserPlus} title="لا توجد حسابات جديدة" />}</CardContent></Card>;
 }
 
 export function RepDetail({ id }) {
-  const { data, summaryOf, api, toast, back } = useApp();
+  const { data, summaryOf, api, toast, back, agencies, agencyName } = useApp();
   const r = data.profiles.find((p) => p.id === id);
   const [confirmStop, setConfirmStop] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => {
     const limit = parseAmount(fd.get('limit')); if (!(limit >= 0)) throw new Error('اكتب حد الائتمان بالأرقام');
-    await api.updateProfile(id, { credit_limit: limit, rep_type: fd.get('rep_type') }); toast('تم حفظ بيانات المندوب');
+    await api.updateProfile(id, { credit_limit: limit, rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null }); toast('تم حفظ بيانات المندوب');
   });
   if (!r) return <Card><Empty title="المندوب غير موجود" /></Card>;
   const s = summaryOf(r);
@@ -199,9 +228,9 @@ export function RepDetail({ id }) {
       <StatCard icon={ShieldCheck} label="حالة الحساب" value={s.over ? 'موقوف' : 'نشط'} sub={s.over ? 'تجاوز حد الائتمان' : 'داخل الحد'} tone={s.over ? 'danger' : 'success'} />
     </div>
     <div className="grid gap-6 xl:grid-cols-5">
-      <div className="xl:col-span-2"><CreditCard sum={s} title={`${r.full_name} · ${REP_TYPE[r.rep_type] || 'مندوب'}`}>
+      <div className="xl:col-span-2"><CreditCard sum={s} title={`${r.full_name} · ${REP_TYPE[r.rep_type] || 'مندوب'}${agencyName(r.agency_id) ? ' · ' + agencyName(r.agency_id) : ''}`}>
         <form onSubmit={submit} className="mt-5 grid gap-2 border-t pt-4">
-          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><Input name="limit" inputMode="decimal" defaultValue={money(r.credit_limit)} className="tnum" /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
+          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><Input name="limit" inputMode="decimal" defaultValue={money(r.credit_limit)} className="tnum" /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><div className="flex-[1_1_110px]"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || ''}><option value="">بدون توكيل</option>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
           <FormError>{error}</FormError>
         </form>
         <div className="mt-4 border-t pt-4">{confirmStop ? <div className="flex flex-wrap items-center gap-2 text-sm"><span className="flex-1">إيقاف الحساب يمنع المندوب من الدخول. متأكد؟</span><Button size="sm" variant="danger" onClick={async () => { await api.updateProfile(id, { active: false }); toast('تم إيقاف حساب ' + r.full_name); back(); }}>إيقاف</Button><Button size="sm" variant="outline" onClick={() => setConfirmStop(false)}>إلغاء</Button></div>
@@ -330,10 +359,12 @@ function AuthShell({ children }) {
 
 export function LoginPage() {
   const { api, signIn } = useApp();
+  const [ags, setAgs] = useState([]);
+  useEffect(() => { api?.listAgencies?.().then(setAgs).catch(() => {}); }, [api]);
   const [tab, setTab] = useState('login');
   const [done, setDone] = useState('');
   const login = useSubmit(async (fd) => signIn(fd.get('username'), fd.get('password')));
-  const signup = useSubmit(async (fd) => { if (!fd.get('rep_type')) throw new Error('اختار نوع المندوب: قطاعي ولا جملة'); await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim(), String(fd.get('rep_type'))); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
+  const signup = useSubmit(async (fd) => { if (ags.length && !fd.get('agency_id')) throw new Error('اختار التوكيل اللي شغال فيه'); if (!fd.get('rep_type')) throw new Error('اختار نوع المندوب: قطاعي ولا جملة'); await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim(), String(fd.get('rep_type')), fd.get('agency_id') || null); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
   return <AuthShell>
     <div className="flex items-center gap-3 lg:hidden"><Logo /><span className="font-bold">السلطان للتوزيع</span></div>
     <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
@@ -345,6 +376,7 @@ export function LoginPage() {
       <Button type="submit" size="lg" disabled={login.busy}>دخول</Button>
     </form> : <form onSubmit={signup.submit} className="grid gap-4">
       <Field label="الاسم بالكامل"><Input name="full_name" required /></Field>
+      {ags.length > 0 && <Field label="التوكيل"><Select name="agency_id" defaultValue="" required><option value="" disabled>اختار التوكيل…</option>{ags.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
       <div className="grid gap-1.5 text-[14px] font-medium"><span>نوع المندوب</span>
         <div className="grid grid-cols-2 gap-2">{[['retail', 'قطاعي', 'محلات وأكشاك'], ['wholesale', 'جملة', 'تجار ومخازن']].map(([v, l, h]) => <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded-md border bg-card p-3 shadow-card has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-foreground"><input type="radio" name="rep_type" value={v} required className="accent-current" /><span><span className="block font-semibold">{l}</span><span className="block text-xs font-normal text-muted-foreground">{h}</span></span></label>)}</div>
       </div>

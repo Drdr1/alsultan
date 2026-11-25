@@ -83,10 +83,10 @@ export function demoSeed() {
   const profiles = [
     { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
     { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', credit_limit: 0, active: true, created_at: at(120) },
-    { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, rep_type: 'wholesale', active: true, created_at: at(100) },
-    { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, rep_type: 'retail', active: true, created_at: at(100) },
-    { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, rep_type: 'retail', active: true, created_at: at(100) },
-    { id: 'u-youssef', username: 'youssef', full_name: 'يوسف رمضان', role: 'rep', credit_limit: 0, rep_type: 'wholesale', active: false, created_at: at(1) },
+    { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, rep_type: 'wholesale', agency_id: 'ag-tiger', active: true, created_at: at(100) },
+    { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, rep_type: 'retail', agency_id: 'ag-molfix', active: true, created_at: at(100) },
+    { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, rep_type: 'retail', agency_id: 'ag-tiger', active: true, created_at: at(100) },
+    { id: 'u-youssef', username: 'youssef', full_name: 'يوسف رمضان', role: 'rep', credit_limit: 0, rep_type: 'wholesale', agency_id: 'ag-molfix', active: false, created_at: at(1) },
   ];
   const passwords = Object.fromEntries(profiles.map((p) => [p.username, '1234']));
   // [rep, name, phone, location, type, weekly invoice, pay ratio]
@@ -116,7 +116,7 @@ export function demoSeed() {
   const round = (n) => Math.round(n / 50) * 50;
   shops.forEach(([rep, name, phone, location, type, weekly, ratio], i) => {
     const id = 'c-' + (i + 1);
-    customers.push({ id, rep_id: rep, name, phone, location, debt_type: rep === 'u-ahmed' ? 'wholesale' : 'retail', created_at: at(84, 9), created_by: rep });
+    customers.push({ id, rep_id: rep, name, phone, location, debt_type: rep === 'u-ahmed' ? 'wholesale' : 'retail', agency_id: rep === 'u-mahmoud' ? 'ag-molfix' : 'ag-tiger', created_at: at(84, 9), created_by: rep });
     const debts = [];
     const opening = round(weekly * (1.4 + rnd()));
     debts.push(opening);
@@ -135,11 +135,12 @@ export function demoSeed() {
   // one pending correction request for the demo
   const c3 = customers[2];
   transactions.push({ id: uid(), customer_id: c3.id, rep_id: c3.rep_id, kind: 'correction', amount: -2000, note: 'العميل دفع 2000 امبارح ونسيت أسجلها - أكد معاه بالتليفون', status: 'pending', occurred_at: at(0, 9), created_at: at(0, 9), created_by: c3.rep_id });
-  return { v: 1, profiles, passwords, customers, transactions };
+  const agencies = [{ id: 'ag-tiger', name: 'تايجر', created_at: at(120) }, { id: 'ag-molfix', name: 'مولفيكس', created_at: at(120) }];
+  return { v: 1, agencies, profiles, passwords, customers, transactions };
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v2';
+  const KEY = 'alsultan-demo-v3';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -206,24 +207,25 @@ export function DemoBackend() {
       setSession(p.id);
       return p;
     },
-    async signUp(username, password, fullName, repType) {
+    async signUp(username, password, fullName, repType, agencyId) {
       const u = String(username).trim().toLowerCase();
       if (db.profiles.some((x) => x.username === u)) throw new Error('اسم المستخدم ده موجود');
-      const p = { id: 'u-' + uid(), username: u, full_name: fullName, role: 'rep', rep_type: repType, credit_limit: 0, active: false, created_at: new Date().toISOString() };
+      const p = { id: 'u-' + uid(), username: u, full_name: fullName, role: 'rep', rep_type: repType, agency_id: agencyId || null, credit_limit: 0, active: false, created_at: new Date().toISOString() };
       db.profiles.push(p); db.passwords[u] = password;
       commit({ table: 'profiles', type: 'INSERT', row: p });
     },
     async signOut() { setSession(null); },
     async loadAll() {
-      const m = me(); if (!m) return { profiles: [], customers: [], transactions: [] };
-      if (m.role === 'admin') return structuredClone({ profiles: db.profiles, customers: db.customers, transactions: db.transactions });
-      return structuredClone({ profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id) });
+      const m = me(); if (!m) return { agencies: [], profiles: [], customers: [], transactions: [] };
+      if (m.role === 'admin') return structuredClone({ agencies: db.agencies, profiles: db.profiles, customers: db.customers, transactions: db.transactions });
+      return structuredClone({ agencies: db.agencies.filter((a) => a.id === m.agency_id), profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id) });
     },
     async addCustomer({ name, phone, location, opening, opening_date, rep_id }) {
       const m = requireActive();
       const owner = m.role === 'admin' && rep_id ? db.profiles.find((x) => x.id === rep_id) : m;
       const debt_type = owner?.rep_type || 'retail';
-      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, created_at: new Date().toISOString(), created_by: m.id };
+      const agency_id = owner?.agency_id || null;
+      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, agency_id, created_at: new Date().toISOString(), created_by: m.id };
       db.customers.push(c);
       if (opening > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: opening, note: 'رصيد افتتاحي', occurred_at: opening_date });
       commit({ table: 'customers', type: 'INSERT', row: c });
@@ -242,6 +244,14 @@ export function DemoBackend() {
       const p = db.profiles.find((x) => x.id === id);
       Object.assign(p, patch);
       commit({ table: 'profiles', type: 'UPDATE', row: p });
+    },
+    async listAgencies() { return structuredClone(db.agencies); },
+    async addAgency(name) {
+      const m = requireActive(); if (m.role !== 'admin') throw new Error('للإدارة فقط');
+      const n = String(name || '').trim(); if (!n) throw new Error('اكتب اسم التوكيل');
+      if (db.agencies.some((a) => a.name === n)) throw new Error('التوكيل ده موجود');
+      const a = { id: 'ag-' + uid(), name: n, created_at: new Date().toISOString() };
+      db.agencies.push(a); commit({ table: 'agencies', type: 'INSERT', row: a }); return a;
     },
     onChange(cb) { listeners.push(cb); },
     resetDemo() { db = demoSeed(); commit({ table: 'all', type: 'RESET' }); },
@@ -272,15 +282,15 @@ export async function SupabaseBackend() {
       if (error) throw new Error('اسم المستخدم أو كلمة المرور غلط');
       return profileOf(data.user.id);
     },
-    async signUp(u, p, name, repType) {
-      const { error } = await sb.auth.signUp({ email: email(u), password: p, options: { data: { username: u.trim().toLowerCase(), full_name: name, rep_type: repType } } });
+    async signUp(u, p, name, repType, agencyId) {
+      const { error } = await sb.auth.signUp({ email: email(u), password: p, options: { data: { username: u.trim().toLowerCase(), full_name: name, rep_type: repType, agency_id: agencyId || null } } });
       if (error) throw new Error(/registered/i.test(error.message) ? 'اسم المستخدم ده موجود' : error.message);
       await sb.auth.signOut();
     },
     async signOut() { await sb.auth.signOut(); },
     async loadAll() {
-      const [profiles, customers, transactions] = await Promise.all([fetchAll('profiles', 'created_at'), fetchAll('customers', 'created_at'), fetchAll('transactions', 'occurred_at')]);
-      return { profiles, customers, transactions };
+      const [agencies, profiles, customers, transactions] = await Promise.all([fetchAll('agencies', 'name'), fetchAll('profiles', 'created_at'), fetchAll('customers', 'created_at'), fetchAll('transactions', 'occurred_at')]);
+      return { agencies, profiles, customers, transactions };
     },
     async addCustomer(c) {
       const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null });
@@ -292,6 +302,8 @@ export async function SupabaseBackend() {
     },
     async reviewTransaction(id, approve) { const { error } = await sb.from('transactions').update({ status: approve ? 'approved' : 'rejected' }).eq('id', id); fail(error); },
     async updateProfile(id, patch) { const { error } = await sb.from('profiles').update(patch).eq('id', id); fail(error); },
+    async listAgencies() { const { data, error } = await sb.from('agencies').select('id,name').order('name'); fail(error); return data; },
+    async addAgency(name) { const { data, error } = await sb.from('agencies').insert({ name: String(name || '').trim() }).select().single(); fail(error); return data; },
     onChange(cb) {
       sb.channel('alsultan-live')
         .on('postgres_changes', { event: '*', schema: 'public' }, (p) => cb({ table: p.table, type: p.eventType, row: p.new, remote: true }))

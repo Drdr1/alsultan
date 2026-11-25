@@ -26,6 +26,14 @@ create table if not exists public.profiles (
   active        boolean not null default false,
   created_at    timestamptz not null default now()
 );
+-- Agencies / brands (توكيلات), e.g. Tiger, Molfix. Admin adds them; each rep belongs to one.
+create table if not exists public.agencies (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null unique check (length(trim(name)) > 0),
+  created_at  timestamptz not null default now()
+);
+alter table public.profiles add column if not exists agency_id uuid references public.agencies(id);
+
 -- Each rep sells either retail (قطاعي) or wholesale (جملة) only; chosen at sign-up.
 alter table public.profiles add column if not exists rep_type text
   check (rep_type in ('retail','wholesale'));
@@ -39,12 +47,13 @@ $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, username, full_name, rep_type)
+  insert into public.profiles (id, username, full_name, rep_type, agency_id)
   values (
     new.id,
     lower(coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))),
     coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), split_part(new.email, '@', 1)),
-    case when new.raw_user_meta_data->>'rep_type' in ('retail','wholesale') then new.raw_user_meta_data->>'rep_type' end
+    case when new.raw_user_meta_data->>'rep_type' in ('retail','wholesale') then new.raw_user_meta_data->>'rep_type' end,
+    (select a.id from public.agencies a where a.id::text = new.raw_user_meta_data->>'agency_id')
   );
   return new;
 end $$;
@@ -76,8 +85,8 @@ begin
   end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('profile', old.id::text, 'update', jsonb_build_object(
-    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type),
-    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name, 'rep_type', new.rep_type)));
+    'before', jsonb_build_object('role', old.role, 'credit_limit', old.credit_limit, 'active', old.active, 'full_name', old.full_name, 'rep_type', old.rep_type, 'agency_id', old.agency_id),
+    'after',  jsonb_build_object('role', new.role, 'credit_limit', new.credit_limit, 'active', new.active, 'full_name', new.full_name, 'rep_type', new.rep_type, 'agency_id', new.agency_id)));
   return new;
 end $$;
 
@@ -99,6 +108,7 @@ create table if not exists public.customers (
   created_by  uuid default auth.uid() references public.profiles(id)
 );
 create index if not exists customers_rep_idx on public.customers(rep_id);
+alter table public.customers add column if not exists agency_id uuid references public.agencies(id);
 
 create or replace function public.guard_customer_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -111,6 +121,7 @@ begin
   end if;
   -- the customer's type always follows the rep who owns it
   new.debt_type := coalesce((select rep_type from public.profiles where id = new.rep_id), 'retail');
+  new.agency_id := (select agency_id from public.profiles where id = new.rep_id);
   new.created_by := me.id;
   new.created_at := now();
   return new;
@@ -264,6 +275,8 @@ drop trigger if exists tx_no_delete on public.transactions;
 create trigger tx_no_delete before delete on public.transactions for each row execute function public.block_delete();
 drop trigger if exists customers_no_delete on public.customers;
 create trigger customers_no_delete before delete on public.customers for each row execute function public.block_delete();
+drop trigger if exists agencies_no_delete on public.agencies;
+create trigger agencies_no_delete before delete on public.agencies for each row execute function public.block_delete();
 drop trigger if exists profiles_no_delete on public.profiles;
 create trigger profiles_no_delete before delete on public.profiles for each row execute function public.block_delete();
 
@@ -292,6 +305,16 @@ alter table public.profiles     enable row level security;
 alter table public.customers    enable row level security;
 alter table public.transactions enable row level security;
 alter table public.audit_log    enable row level security;
+alter table public.agencies     enable row level security;
+
+-- Agency names are public (the sign-up page lists them); only admins add or rename.
+drop policy if exists agencies_select on public.agencies;
+create policy agencies_select on public.agencies for select using (true);
+drop policy if exists agencies_insert on public.agencies;
+create policy agencies_insert on public.agencies for insert with check (public.is_admin());
+drop policy if exists agencies_update on public.agencies;
+create policy agencies_update on public.agencies for update using (public.is_admin());
+grant select on public.agencies to anon;
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles for select using (id = auth.uid() or public.is_admin());
@@ -322,6 +345,7 @@ do $$ begin
   begin alter publication supabase_realtime add table public.transactions; exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.customers;    exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.profiles;     exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.agencies;     exception when duplicate_object then null; end;
 end $$;
 
 -- ---------------------------------------------------------------------

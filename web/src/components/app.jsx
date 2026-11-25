@@ -33,7 +33,7 @@ export function StatCard({ icon: Icon, label, value, sub, tone = 'default' }) {
 
 /* customers table with search + type filter */
 export function CustomerTable({ list, showRep = false, onCollect, initialQuery = '', emptyText }) {
-  const { stats, go, nameOf, data } = useApp();
+  const { stats, go, nameOf, data, agencyName } = useApp();
   const [q, setQ] = useState(initialQuery);
   const repType = (id) => data.profiles.find((p) => p.id === id)?.rep_type;
   const [type, setType] = useState('all');
@@ -58,7 +58,7 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
           <TBody>{rows.map((c) => { const s = stats.get(c.id); return (
             <TR key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className={cn('cursor-pointer', s.overdue ? 'bg-danger-soft/60 hover:bg-danger-soft' : 'hover:bg-muted/50')}>
               <TD><div className="flex items-center gap-3"><Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'default'} /><div className="min-w-0"><div className={cn('font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="text-xs text-muted-foreground">{c.location}{c.phone && <> · <span dir="ltr">{c.phone}</span></>}</div></div></div></TD>
-              {showRep && <TD className="text-muted-foreground"><div>{nameOf(c.rep_id)}</div><div className="text-xs">{TYPE[repType(c.rep_id)]}</div></TD>}
+              {showRep && <TD className="text-muted-foreground"><div>{nameOf(c.rep_id)}</div><div className="text-xs">{[TYPE[repType(c.rep_id)], agencyName(data.profiles.find((p) => p.id === c.rep_id)?.agency_id)].filter(Boolean).join(' · ')}</div></TD>}
               <TD className={cn('text-end font-semibold tnum', s.overdue && 'text-danger')}>{money(s.balance)}</TD>
               <TD className="text-end tnum text-muted-foreground">{s.monthCollected ? money(s.monthCollected) : '—'}</TD>
               <TD><div className="flex flex-wrap gap-1.5"><DueBadge s={s} />{s.pending > 0 && <Badge variant="warning">تصحيح معلق</Badge>}</div></TD>
@@ -187,11 +187,12 @@ export function RepBarsCard({ sums, onOpen }) {
 }
 
 export function RepCard({ r, s, onClick }) {
+  const { agencyName } = useApp();
   const lv = level(s);
   return <button onClick={onClick} className={cn('group grid gap-4 rounded-lg border bg-card p-5 text-start shadow-card transition-colors hover:border-foreground/20', s.over && 'border-danger/40')}>
     <div className="flex items-center gap-3">
       <Avatar name={r.full_name.charAt(0)} tone={s.over ? 'danger' : 'brand'} />
-      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground">{REP_TYPE[r.rep_type] || 'مندوب'} · <span dir="ltr">@{r.username}</span></div></div>
+      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground">{[REP_TYPE[r.rep_type] || 'مندوب', agencyName(r.agency_id)].filter(Boolean).join(' · ')} · <span dir="ltr">@{r.username}</span></div></div>
       {s.over ? <Badge variant="solid">موقوف</Badge> : <Badge variant={lv === 'warning' ? 'warning' : 'success'} dot>{lv === 'warning' ? 'قريب من الحد' : 'نشط'}</Badge>}
     </div>
     <div>

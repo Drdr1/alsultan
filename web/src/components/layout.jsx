@@ -3,7 +3,7 @@ import { Storefront } from '@phosphor-icons/react';
 import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun } from './icons.jsx';
 import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
-import { Avatar, Badge, Button, cn } from './ui.jsx';
+import { Avatar, Badge, Button, Select, cn } from './ui.jsx';
 
 export function Logo({ className }) {
   return <span className={cn('inline-flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground', className)} aria-hidden="true">
@@ -21,15 +21,23 @@ export function ThemeToggle({ className }) {
   return <Button variant="outline" size="icon" className={className} onClick={flip} aria-label={dark ? 'الوضع الفاتح' : 'الوضع الليلي'} title={dark ? 'الوضع الفاتح' : 'الوضع الليلي'}>{dark ? <Sun /> : <Moon />}</Button>;
 }
 
+function AgencyPicker({ className }) {
+  const { me, agencies, agency, setAgency } = useApp();
+  if (me.role !== 'admin' || agencies.length === 0) return null;
+  return <Select aria-label="التوكيل" value={agency} onChange={(e) => setAgency(e.target.value)} className={cn('font-medium', agency !== 'all' && 'border-foreground/40', className)}>
+    <option value="all">كل التوكيلات</option>{agencies.map((a) => <option key={a.id} value={a.id}>توكيل {a.name}</option>)}
+  </Select>;
+}
+
 function useNav() {
-  const { me, data, reps, overdue } = useApp();
+  const { me, data, raw, overdue } = useApp();
   if (me.role === 'admin') return [
     ['home', LayoutDashboard, 'لوحة التحكم', 0],
     ['reps', Users, 'المناديب', 0],
     ['customers', Store, 'العملاء', 0],
     ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger'],
     ['approvals', ClipboardCheck, 'طلبات التصحيح', data.transactions.filter((t) => t.status === 'pending').length, 'warning'],
-    ['accounts', UserPlus, 'حسابات جديدة', reps.filter((r) => !r.active).length, 'brand'],
+    ['accounts', UserPlus, 'حسابات جديدة', raw.profiles.filter((r) => r.role === 'rep' && !r.active).length, 'brand'],
   ];
   return [['home', Home, 'الرئيسية', 0], ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger']];
 }
@@ -62,7 +70,7 @@ function BellMenu() {
 }
 
 export function Layout({ children }) {
-  const { me, view, stack, nav, back, signOut, live, data, api } = useApp();
+  const { me, view, stack, nav, back, signOut, live, data, api, agencyName } = useApp();
   const items = useNav();
   const active = view.name === 'rep' ? 'reps' : view.name === 'customer' ? (stack[0]?.name || 'home') : view.name;
   const trail = [];
@@ -92,7 +100,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? 'مدير' : (REP_TYPE[me.rep_type] || 'مندوب مبيعات')}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? 'مدير' : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>
@@ -106,11 +114,13 @@ export function Layout({ children }) {
           {trail.length > 1 && <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">{trail.slice(0, -1).map((t, i) => <span key={i} className="inline-flex items-center gap-1">{t}<ChevronLeft className="size-3" /></span>)}</div>}
           <h1 className="truncate text-lg font-semibold leading-tight">{title}</h1>
         </div>
+        <div className="hidden w-48 shrink-0 md:block"><AgencyPicker /></div>
         <ThemeToggle />
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
       <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1800px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
+        <AgencyPicker className="md:hidden" />
         {children}
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
           {api?.mode === 'demo' ? <><span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-warning" />نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button className="font-medium text-foreground hover:underline" onClick={() => api.resetDemo()}>استرجاع البيانات التجريبية</button></>
