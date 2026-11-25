@@ -64,7 +64,7 @@ export function AppProvider({ children }) {
               }, 300);
             }
           }
-          if (evt?.type === 'RESET') { setView({ name: 'home' }); setStack([]); }
+          if (evt?.type === 'RESET') { setView({ name: 'home' }); setStack([]); notified.current.clear(); try { localStorage.removeItem(NKEY); } catch { /* storage blocked */ } }
           clearTimeout(timer); timer = setTimeout(() => reload(a).catch((e) => toast(e.message, 'err')), 120);
         });
         setApi(a);
