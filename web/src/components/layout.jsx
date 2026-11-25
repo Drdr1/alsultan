@@ -34,10 +34,10 @@ function NotifyPrompt() {
     <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"><BellRinging className="size-5" /></span>
     <div className="min-w-0 flex-[1_1_240px] text-sm">
       <div className="font-semibold">خلّي التنبيهات توصلك على الموبايل</div>
-      <div className="mt-0.5 text-muted-foreground">{iosBrowser
+      {(iosBrowser || perm === 'denied') && <div className="mt-0.5 text-muted-foreground">{iosBrowser
         ? <>على الآيفون: دوس زرار المشاركة <ShareIcon className="inline size-4 align-text-bottom" /> تحت، واختار «إضافة إلى الشاشة الرئيسية»، وافتح دفتر السلطان من الأيقونة اللي هتظهر، وبعدها فعّل الإشعارات من هنا.</>
         : perm === 'denied' ? 'الإشعارات مقفولة. افتح إعدادات المتصفح للموقع ده واسمح بالإشعارات.'
-        : 'هيوصلك تنبيه لما عميل يعدّي مدة الأجل أو يتسجل تحصيل جديد، حتى وانت فاتح حاجة تانية على الموبايل.'}</div>
+        : null}</div>}
     </div>
     <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:flex-1">
       {canInstall() && <Button variant="outline" onClick={install}>تنزيل كأبلكيشن</Button>}

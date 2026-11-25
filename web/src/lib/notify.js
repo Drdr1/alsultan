@@ -41,6 +41,6 @@ export async function enableNotifications() {
   if (!('Notification' in window)) return 'unsupported';
   const p = await Notification.requestPermission();
   ping();
-  if (p === 'granted') notify('الإشعارات اشتغلت', 'هيوصلك تنبيه لما عميل يعدّي مدة الأجل أو يتسجل تحصيل جديد.', 'welcome');
+  if (p === 'granted') notify('الإشعارات اشتغلت', '', 'welcome');
   return p;
 }
