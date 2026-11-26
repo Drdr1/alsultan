@@ -85,8 +85,8 @@ export function demoSeed() {
   const now = Date.now();
   const at = (daysAgo, h = 11) => { const d = new Date(now - daysAgo * DAY); d.setHours(h, 15, 0, 0); return d.toISOString(); };
   const profiles = [
-    { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', is_owner: true, title: 'أونر', credit_limit: 0, active: true, created_at: at(120) },
-    { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', is_owner: true, title: 'أونر', credit_limit: 0, active: true, created_at: at(120) },
+    { id: 'u-sayed', username: 'sayed', full_name: 'سيد', role: 'admin', is_owner: true, title: 'مدير عام', credit_limit: 0, active: true, created_at: at(120) },
+    { id: 'u-mohamed', username: 'mohamed', full_name: 'محمد', role: 'admin', is_owner: true, title: 'مدير عام', credit_limit: 0, active: true, created_at: at(120) },
     { id: 'u-barqi', username: 'barqi', full_name: 'محمد البرقي', role: 'admin', title: 'مدير فرع تايجر', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-younis', username: 'younis', full_name: 'محمد يونس', role: 'admin', title: 'مشرف تجزئة', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-aref', username: 'aref', full_name: 'أحمد عارف', role: 'admin', title: 'مشرف جملة', scopes: [{ agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
@@ -147,7 +147,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v6';
+  const KEY = 'alsultan-demo-v7';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -268,18 +268,18 @@ export function DemoBackend() {
       const m = requireActive(); if (m.role !== 'admin') throw new Error('للإدارة فقط');
       const p = db.profiles.find((x) => x.id === id);
       if (!p) throw new Error('الحساب مش موجود');
-      if ('is_owner' in patch && !!patch.is_owner !== !!p.is_owner) throw new Error('مينفعش تغيير الأونر من هنا');
+      if ('is_owner' in patch && !!patch.is_owner !== !!p.is_owner) throw new Error('مينفعش تغيير المدير العام من هنا');
       if (!isOwner(m)) {
         if (!repVisible(m, id)) throw new Error('الحساب ده مش في صلاحياتك');
-        if (('role' in patch && patch.role !== p.role) || 'scopes' in patch || 'title' in patch) throw new Error('الصلاحيات بيحددها الأونر بس');
+        if (('role' in patch && patch.role !== p.role) || 'scopes' in patch || 'title' in patch) throw new Error('الصلاحيات بيحددها المدير العام بس');
         if (!inScopes(m, { ...p, ...patch })) throw new Error('مينفعش تنقل مندوب لحاجة مش في صلاحياتك');
-      } else if (isOwner(p) && p.id !== m.id) throw new Error('مينفعش تعدّل حساب أونر تاني');
+      } else if (isOwner(p) && p.id !== m.id) throw new Error('مينفعش تعدّل حساب مدير عام تاني');
       Object.assign(p, patch);
       commit({ table: 'profiles', type: 'UPDATE', row: p });
     },
     async listAgencies() { return structuredClone(db.agencies); },
     async addAgency(name) {
-      const m = requireActive(); if (!isOwner(m)) throw new Error('للأونر بس');
+      const m = requireActive(); if (!isOwner(m)) throw new Error('للمدير العام بس');
       const n = String(name || '').trim(); if (!n) throw new Error('اكتب اسم التوكيل');
       if (db.agencies.some((a) => a.name === n)) throw new Error('التوكيل ده موجود');
       const a = { id: 'ag-' + uid(), name: n, created_at: new Date().toISOString() };

@@ -348,15 +348,15 @@ function AuthShell({ children }) {
     <div className="flex items-center justify-center px-5 pb-12 pt-20 lg:py-12">
       <div className="grid w-full max-w-sm gap-7">{children}</div>
     </div>
-    <div className="relative hidden flex-col justify-between overflow-hidden border-s bg-sidebar p-10 lg:flex">
+    <div className="relative hidden flex-col items-center justify-center gap-10 overflow-hidden border-s bg-sidebar p-10 pb-16 lg:flex">
       <img src="./logo-banner.jpg" alt="شركة السلطان" className="w-full max-w-md rounded-xl shadow-card" />
-      <div className="grid max-w-md gap-6">
+      <div className="grid w-full max-w-md gap-6">
         <div><h2 className="text-3xl font-bold leading-tight tracking-tight">دفتر مديونيات المناديب</h2><p className="mt-3 leading-relaxed text-muted-foreground">تسجيل العملاء والتحصيل اليومي، ومتابعة لحظية للإدارة، وأرشيف كامل لكل حركة لا يُحذف.</p></div>
         <div className="grid grid-cols-2 gap-3">
           {[[Zap, 'تحديث لحظي', 'بين المندوب والإدارة بدون إعادة تحميل', 'text-brand'], [ShieldCheck, 'حد ائتمان', 'إيقاف تلقائي للآجل عند التجاوز', 'text-success'], [Clock, `أجل ${TERM_DAYS} يوم`, 'تنبيه بالعملاء المتأخرين', 'text-danger'], [Archive, 'أرشيف دائم', 'كل حركة بتاريخها ومن سجّلها', 'text-warning']].map(([I, t, d, c]) => <div key={t} className="rounded-lg border bg-card p-4 shadow-card"><I className={cn('size-5', c)} /><div className="mt-3 text-sm font-semibold">{t}</div><div className="mt-0.5 text-xs text-muted-foreground">{d}</div></div>)}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} السلطان للتوزيع</p>
+      <p className="absolute inset-x-0 bottom-6 text-center text-xs text-muted-foreground">© {new Date().getFullYear()} السلطان للتوزيع</p>
     </div>
   </div>;
 }
@@ -393,7 +393,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'أونر'], ['mohamed', 'محمد', 'أونر'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
@@ -456,7 +456,7 @@ function RepAccessRow({ r }) {
 export function SettingsPage() {
   const { raw, owner, api, toast } = useApp();
   const [pick, setPick] = useState('');
-  if (!owner) return <Empty icon={Lock} title="الصفحة دي للأونر بس" />;
+  if (!owner) return <Empty icon={Lock} title="الصفحة دي للمدير العام بس" />;
   const owners = raw.profiles.filter((p) => p.role === 'admin' && p.is_owner);
   const managers = raw.profiles.filter((p) => p.role === 'admin' && !p.is_owner);
   const reps = raw.profiles.filter((p) => p.role === 'rep');
@@ -483,7 +483,7 @@ export function SettingsPage() {
         <TBody>{reps.map((r) => <RepAccessRow key={r.id} r={r} />)}</TBody></Table></CardContent>
     </Card>
     <Card>
-      <CardHeader><div><CardTitle>الأونر</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>المديرين العامين</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
       <CardContent className="flex flex-wrap gap-3">{owners.map((o) => <div key={o.id} className="flex items-center gap-2 rounded-md border px-3 py-2"><Avatar name={o.full_name.charAt(0)} size="sm" tone="brand" /><span className="text-sm font-medium">{o.full_name}</span></div>)}</CardContent>
     </Card>
   </>;

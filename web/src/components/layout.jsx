@@ -144,7 +144,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.title || (me.is_owner ? 'أونر' : scopeLabel(me.scopes, agencyName) || 'مدير')) : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.title || (me.is_owner ? 'مدير عام' : scopeLabel(me.scopes, agencyName) || 'مدير')) : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>
