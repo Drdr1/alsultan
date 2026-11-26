@@ -3,6 +3,8 @@ import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSumm
 import { useToast } from '../components/ui.jsx';
 import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
+export const IDLE_HOUR = 19; // 7 PM: time to warn about reps with no activity today
+
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
@@ -96,6 +98,23 @@ export function AppProvider({ children }) {
   // a customer passing the credit term, and a rep going over his credit limit. Once a day each.
   const overdueAll = useMemo(() => raw.customers.filter((c) => stats.get(c.id)?.overdue), [raw.customers, stats]);
   const overLimit = useMemo(() => raw.profiles.filter((p) => p.role === 'rep' && p.active).map((r) => ({ r, s: repSummary(r, raw.customers, stats) })).filter((x) => x.s.over), [raw.profiles, raw.customers, stats]);
+  // Reps who logged no invoice and no collection today (checked from IDLE_HOUR in the evening).
+  const idleReps = useMemo(() => {
+    const now = new Date(); if (now.getHours() < IDLE_HOUR) return [];
+    const today = now.toDateString();
+    const busy = new Set(raw.transactions.filter((t) => (t.kind === 'invoice' || t.kind === 'collection') && new Date(t.created_at).toDateString() === today).map((t) => t.rep_id));
+    return raw.profiles.filter((p) => p.role === 'rep' && p.active && !busy.has(p.id));
+  }, [raw, stats]);
+  useEffect(() => {
+    if (!me || me.role !== 'admin' || permission() !== 'granted') return;
+    const fresh = idleReps.filter((r) => !notified.current.has('idle-' + r.id));
+    if (!fresh.length) return;
+    fresh.forEach((r) => notified.current.add('idle-' + r.id));
+    try { localStorage.setItem(NKEY, JSON.stringify([...notified.current])); } catch { /* storage blocked */ }
+    if (fresh.length <= 3) fresh.forEach((r) => notify(`${r.full_name} مسجلش أي حركة النهارده`, 'لا فواتير ولا تحصيلات من الصبح', 'idle-' + r.id, '#rep=' + r.id));
+    else notify(`${fresh.length} مناديب مسجلوش حركة النهارده`, fresh.map((r) => r.full_name).join('، '), 'idle', '#report');
+  }, [idleReps, me]);
+
   useEffect(() => {
     if (!me || permission() !== 'granted') return;
     const mark = (k) => { if (notified.current.has(k)) return false; notified.current.add(k); return true; };
@@ -130,6 +149,7 @@ export function AppProvider({ children }) {
       if (!r || me.role !== 'admin') return;
       if (r.agency_id) setAgency(r.agency_id);
       setStack([{ name: 'reps' }]); setView({ name: 'rep', id: r.id }); window.scrollTo({ top: 0 });
+    } else if (t === '#report') { setStack([]); setView({ name: 'report' }); window.scrollTo({ top: 0 });
     } else if (t === '#overdue') { setStack([]); setView({ name: 'overdue' }); window.scrollTo({ top: 0 }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, raw, targetTick]);
@@ -141,6 +161,6 @@ export function AppProvider({ children }) {
   const signIn = async (u, p) => { const m = await api.signIn(u, p); setMe(m); setView({ name: 'home' }); setStack([]); await reload(); };
   const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [] }); setView({ name: 'home' }); setStack([]); };
 
-  const value = { api, boot, me, owner, overLimit, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const value = { api, boot, me, owner, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

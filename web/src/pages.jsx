@@ -70,10 +70,13 @@ export function AdminHome() {
   const [q, setQ] = useState('');
   return <>
     <Greeting name={me.full_name}>
-      <form onSubmit={(e) => { e.preventDefault(); go({ name: 'customers', q }); }} className="relative w-full sm:w-80">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <form onSubmit={(e) => { e.preventDefault(); go({ name: 'customers', q }); }} className="relative flex-[1_1_220px] sm:w-80 sm:flex-none">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن عميل…" className="ps-9" type="search" />
       </form>
+      <Button variant="outline" onClick={() => nav('report')} className="max-sm:w-full"><FileText />تقرير المديونية</Button>
+      </div>
     </Greeting>
     {(pendTx > 0 || pendAcc > 0) && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4">
       <BellRing className="size-5 shrink-0 text-warning" />
@@ -390,7 +393,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'المالك'], ['mohamed', 'محمد', 'المالك'], ['barqi', 'محمد البرقي', 'مدير تايجر قطاعي'], ['younis', 'محمد يونس', 'مدير تايجر جملة'], ['aref', 'أحمد عارف', 'مدير تايجر قطاعي وجملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'أونر'], ['mohamed', 'محمد', 'أونر'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
@@ -423,6 +426,7 @@ function ManagerRow({ m }) {
     <div className="flex flex-wrap items-center gap-3">
       <Avatar name={m.full_name.charAt(0)} tone="brand" />
       <div className="min-w-0 flex-1"><div className="font-semibold">{m.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{m.username}</span>{!m.active && ' · موقوف'}</div></div>
+      <Input aria-label="المسمّى الوظيفي" key={m.title || ''} defaultValue={m.title || ''} placeholder="المسمّى (مثلاً: مشرف جملة)" disabled={busy} onBlur={(e) => { const v = e.target.value.trim(); if (v !== (m.title || '')) save({ title: v }, 'تم حفظ المسمّى'); }} className="w-full sm:w-56" />
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ active: !m.active }, m.active ? `تم إيقاف ${m.full_name}` : `تم تفعيل ${m.full_name}`)}>{m.active ? 'إيقاف' : 'تفعيل'}</Button>
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ role: 'rep', scopes: [], active: false }, `${m.full_name} رجع حساب مندوب (موقوف)`)}>إلغاء الإدارة</Button>
     </div>
@@ -452,12 +456,12 @@ function RepAccessRow({ r }) {
 export function SettingsPage() {
   const { raw, owner, api, toast } = useApp();
   const [pick, setPick] = useState('');
-  if (!owner) return <Empty icon={Lock} title="الصفحة دي للمالك بس" />;
+  if (!owner) return <Empty icon={Lock} title="الصفحة دي للأونر بس" />;
   const owners = raw.profiles.filter((p) => p.role === 'admin' && p.is_owner);
   const managers = raw.profiles.filter((p) => p.role === 'admin' && !p.is_owner);
   const reps = raw.profiles.filter((p) => p.role === 'rep');
   const promotable = reps.filter((r) => !raw.customers.some((c) => c.rep_id === r.id));
-  const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [] }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
+  const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [], title: 'مشرف' }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
   return <>
     <Card>
       <CardHeader><div><CardTitle>المديرين</CardTitle><CardDescription>اختار لكل مدير التوكيل والنوع اللي يشوفه. المدير مش بيشوف غير مناديب وعملاء الحاجات اللي متعلّم عليها، والتعديل بيتحفظ على طول.</CardDescription></div></CardHeader>
@@ -479,8 +483,57 @@ export function SettingsPage() {
         <TBody>{reps.map((r) => <RepAccessRow key={r.id} r={r} />)}</TBody></Table></CardContent>
     </Card>
     <Card>
-      <CardHeader><div><CardTitle>المُلّاك</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>الأونر</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
       <CardContent className="flex flex-wrap gap-3">{owners.map((o) => <div key={o.id} className="flex items-center gap-2 rounded-md border px-3 py-2"><Avatar name={o.full_name.charAt(0)} size="sm" tone="brand" /><span className="text-sm font-medium">{o.full_name}</span></div>)}</CardContent>
+    </Card>
+  </>;
+}
+
+/* ================= daily debt report ================= */
+export function ReportPage() {
+  const { data, reps, summaryOf, agencyName, agency, go, idleReps } = useApp();
+  const today = new Date().toDateString();
+  const isToday = (t) => new Date(t.created_at).toDateString() === today;
+  const idleIds = new Set(idleReps.map((r) => r.id));
+  const rows = reps.filter((r) => r.active).map((r) => {
+    const s = summaryOf(r);
+    const tx = data.transactions.filter((t) => t.rep_id === r.id && t.status === 'approved' && (t.kind === 'invoice' || t.kind === 'collection'));
+    const td = tx.filter(isToday);
+    const sum = (k) => td.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
+    const last = tx.reduce((m, t) => (t.created_at > m ? t.created_at : m), '');
+    return { r, s, inv: sum('invoice'), col: sum('collection'), moves: td.length, last };
+  }).sort((a, b) => b.s.pct - a.s.pct);
+  const total = rows.reduce((a, x) => a + x.s.total, 0);
+  const stopped = rows.filter((x) => x.s.over);
+  const idle = rows.filter((x) => !x.moves);
+  return <>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div><h2 className="text-2xl font-bold tracking-tight">تقرير المديونية</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</p></div>
+      <Button variant="outline" onClick={() => window.print()} className="print:hidden"><FileText />طباعة</Button>
+    </div>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
+      <StatCard label="إجمالي المديونية" value={money(total)} sub={`${rows.length} مندوب`} icon={Wallet} />
+      <StatCard label="موقوفين عن البضاعة" value={stopped.length} sub={stopped.length ? stopped.map((x) => x.r.full_name).join('، ') : 'كله تحت الحد'} icon={Lock} tone={stopped.length ? 'danger' : undefined} />
+      <StatCard label="مسجلوش حركة النهارده" value={idle.length} sub={idle.length ? idle.map((x) => x.r.full_name).join('، ') : 'كله اشتغل'} icon={Clock} tone={idle.length ? 'warning' : undefined} />
+    </div>
+    {stopped.length > 0 && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm">
+      <Lock className="mt-0.5 size-5 shrink-0 text-danger" />
+      <div>المندوب اللي عدّى حد الائتمان حسابه بيتقفل على الفواتير الجديدة تلقائياً، يعني <span className="font-semibold">ميخدش بضاعة</span> لحد ما يحصّل وينزل تحت الحد. التحصيل مفتوح له عادي.</div>
+    </div>}
+    <Card>
+      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>مرتبين من الأقرب للحد. "النهارده" يعني الفواتير والتحصيلات اللي اتسجلت النهارده.</CardDescription></div></CardHeader>
+      <CardContent className="p-0">{rows.length ? <Table><THead><TR><TH>المندوب</TH><TH className="text-end">المديونية</TH><TH className="text-end">الحد</TH><TH className="text-end">فواتير النهارده</TH><TH className="text-end">تحصيل النهارده</TH><TH>آخر حركة</TH><TH>الحالة</TH></TR></THead>
+        <TBody>{rows.map(({ r, s, inv, col, moves, last }) => <TR key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => go({ name: 'rep', id: r.id })}>
+          <TD><div className="font-medium">{r.full_name}</div><div className="text-xs text-muted-foreground">{REP_TYPE[r.rep_type] || ''}</div></TD>
+          <TD className={cn('tnum text-end font-semibold', s.over && 'text-danger')}>{money(s.total)}</TD>
+          <TD className="tnum text-end text-muted-foreground">{money(s.limit)}</TD>
+          <TD className="tnum text-end">{inv ? money(inv) : '—'}</TD>
+          <TD className="tnum text-end">{col ? money(col) : '—'}</TD>
+          <TD className="whitespace-nowrap text-xs text-muted-foreground">{last ? fmtDT(last) : '—'}</TD>
+          <TD><div className="flex flex-wrap gap-1">{s.over ? <Badge variant="danger" dot>موقوف عن البضاعة</Badge> : s.pct >= 0.9 ? <Badge variant="warning" dot>قرب من الحد</Badge> : <Badge variant="success" dot>متاح</Badge>}
+            {!moves && <Badge variant={idleIds.has(r.id) ? 'warning' : 'default'}>مفيش حركة النهارده</Badge>}</div></TD>
+        </TR>)}</TBody></Table> : <Empty icon={Users} title="لا يوجد مناديب مفعّلين" />}</CardContent>
     </Card>
   </>;
 }

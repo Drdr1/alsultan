@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings } from './icons.jsx';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings, FileText } from './icons.jsx';
 import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
 import { permission, enableNotifications, isIOS, isStandalone, canInstall, install, onPWAChange } from '../lib/notify.js';
 import { useApp } from '../lib/store.jsx';
@@ -67,6 +67,7 @@ function useNav() {
     ['customers', Store, 'العملاء', 0],
     ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger'],
     ['approvals', ClipboardCheck, 'طلبات التصحيح', data.transactions.filter((t) => t.status === 'pending').length, 'warning'],
+    ['report', FileText, 'تقرير المديونية', 0],
     ['accounts', UserPlus, 'حسابات جديدة', raw.profiles.filter((r) => r.role === 'rep' && !r.active).length, 'brand'],
     ...(owner ? [['settings', Settings, 'الإعدادات والصلاحيات', 0]] : []),
   ];
@@ -74,12 +75,14 @@ function useNav() {
 }
 
 const SHORT = { home: 'الرئيسية', approvals: 'التصحيح', accounts: 'الحسابات' };
-const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة', settings: 'الإعدادات والصلاحيات' };
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة', report: 'تقرير المديونية', settings: 'الإعدادات والصلاحيات' };
 
 function BellMenu() {
-  const { overdue, go, me, nameOf, stats, overLimit, agency } = useApp();
-  const reps = overLimit.filter(({ r }) => me.role !== 'admin' || agency === 'all' || r.agency_id === agency);
-  const count = overdue.length + reps.length;
+  const { overdue, go, me, nameOf, stats, overLimit, idleReps, agency } = useApp();
+  const mineAg = (r) => me.role !== 'admin' || agency === 'all' || r.agency_id === agency;
+  const reps = overLimit.filter(({ r }) => mineAg(r));
+  const idle = me.role === 'admin' ? idleReps.filter(mineAg) : [];
+  const count = overdue.length + reps.length + idle.length;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => { const h = (e) => !ref.current?.contains(e.target) && setOpen(false); document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
@@ -96,6 +99,10 @@ function BellMenu() {
         {reps.map(({ r, s }) => <button key={r.id} onClick={() => { setOpen(false); if (me.role === 'admin') go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-warning" />
           <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{r.id === me.id ? 'انت' : r.full_name}</span><span className="shrink-0 text-xs font-medium text-warning">عدّى حد الائتمان</span></span><span className="block text-xs text-muted-foreground">المديونية {money(s.total)} من {money(s.limit)} ج.م</span></span>
+        </button>)}
+        {idle.map((r) => <button key={'i' + r.id} onClick={() => { setOpen(false); go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
+          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-muted-foreground" />
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{r.full_name}</span><span className="shrink-0 text-xs font-medium text-muted-foreground">مسجلش حركة النهارده</span></span><span className="block text-xs text-muted-foreground">لا فواتير ولا تحصيلات</span></span>
         </button>)}
         {count ? overdue.slice(0, 30).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => { setOpen(false); go({ name: 'customer', id: c.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-danger" />
@@ -137,7 +144,7 @@ export function Layout({ children }) {
         <div className="flex items-center gap-2 px-3 text-xs text-muted-foreground"><span className={cn('size-2 rounded-full', live === 'SUBSCRIBED' ? 'bg-success animate-pulse' : 'bg-warning')} />{live === 'SUBSCRIBED' ? 'متصل · التحديث لحظي' : 'جاري إعادة الاتصال…'}</div>
         <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5 shadow-card">
           <Avatar name={me.full_name.charAt(0)} tone="brand" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.is_owner ? 'المالك · كل التوكيلات' : scopeLabel(me.scopes, agencyName) || 'مدير') : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{me.full_name}</div><div className="text-xs text-muted-foreground">{me.role === 'admin' ? (me.title || (me.is_owner ? 'أونر' : scopeLabel(me.scopes, agencyName) || 'مدير')) : [REP_TYPE[me.rep_type] || 'مندوب مبيعات', agencyName(me.agency_id)].filter(Boolean).join(' · ')}</div></div>
           <Button variant="ghost" size="icon" onClick={signOut} title="تسجيل الخروج" aria-label="تسجيل الخروج"><LogOut /></Button>
         </div>
       </div>
@@ -170,7 +177,7 @@ export function Layout({ children }) {
 
     {/* mobile bottom nav */}
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.filter(([k]) => k !== 'settings').map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+      {items.filter(([k]) => k !== 'settings' && k !== 'report').map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
         <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
         {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}
       </button>)}

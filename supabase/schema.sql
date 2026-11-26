@@ -49,6 +49,8 @@ $$;
 --            sees only reps (and their customers / ledger) whose agency + type is in the list.
 alter table public.profiles add column if not exists is_owner boolean not null default false;
 alter table public.profiles add column if not exists scopes jsonb not null default '[]'::jsonb;
+-- job title shown in the app, e.g. أونر / مدير فرع تايجر / مشرف تجزئة / مشرف جملة (set by owners)
+alter table public.profiles add column if not exists title text;
 
 create or replace function public.is_owner() returns boolean
 language sql stable security definer set search_path = public as $$
@@ -114,14 +116,14 @@ begin
     raise exception 'التعديل مسموح للإدارة فقط';
   end if;
   if new.is_owner is distinct from old.is_owner and auth.uid() is not null then
-    raise exception 'مينفعش تغيير المالك من هنا';
+    raise exception 'مينفعش تغيير الأونر من هنا';
   end if;
   if auth.uid() is not null and public.is_owner() then
-    if old.is_owner and old.id <> auth.uid() then raise exception 'مينفعش تعدّل حساب مالك تاني'; end if;
+    if old.is_owner and old.id <> auth.uid() then raise exception 'مينفعش تعدّل حساب أونر تاني'; end if;
   elsif auth.uid() is not null then
     -- managers: only reps inside their scopes, never permissions, never move a rep outside their scopes
     if not public.can_manage_rep(old.id) then raise exception 'الحساب ده مش في صلاحياتك'; end if;
-    if new.role <> old.role or new.scopes is distinct from old.scopes then raise exception 'الصلاحيات بيحددها المالك بس'; end if;
+    if new.role <> old.role or new.scopes is distinct from old.scopes or new.title is distinct from old.title then raise exception 'الصلاحيات بيحددها الأونر بس'; end if;
     if not public.in_my_scopes(new.agency_id, new.rep_type) then raise exception 'مينفعش تنقل مندوب لحاجة مش في صلاحياتك'; end if;
   end if;
   insert into public.audit_log (entity, entity_id, action, details)
@@ -401,7 +403,7 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- After Sayed and Mohamed sign up from the site, make them the owners:
---   update public.profiles set role = 'admin', active = true, is_owner = true where username in ('sayed','mohamed');
+--   update public.profiles set role = 'admin', active = true, is_owner = true, title = 'أونر' where username in ('sayed','mohamed');
 -- Managers are then set up by the owners from the app's settings page (no SQL needed).
 -- (run in SQL editor; the guard trigger allows it because the SQL editor runs as postgres)
 -- ---------------------------------------------------------------------
