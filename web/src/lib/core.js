@@ -180,6 +180,8 @@ export function demoSeed() {
   const c1 = customers[0];
   transactions.push({ id: uid(), customer_id: c1.id, rep_id: c1.rep_id, kind: 'return', amount: 3500, note: 'مرتجع 5 كراتين منتهية الصلاحية', status: 'pending', occurred_at: at(0, 10), created_at: at(0, 10), created_by: c1.rep_id });
   customers.push({ id: 'c-new', rep_id: 'u-karim', name: 'ماركت الأمل', owner_name: 'عم شعبان', code: null, status: 'pending', phone: '01099887766', location: 'الجناين - الشلوفة', debt_type: 'retail', agency_id: 'ag-tiger', opening_amount: 4200, opening_date: at(3, 12), created_at: at(0, 9), created_by: 'u-karim' });
+  const ck = customers.find((c) => c.rep_id === 'u-karim' && c.status === 'approved');
+  transactions.push({ id: uid(), customer_id: ck.id, rep_id: 'u-karim', kind: 'collection', amount: 1500, note: '', status: 'approved', occurred_at: at(1, 21), created_at: at(1, 21), created_by: 'u-karim' });
   // daily closings for every past day each rep worked (karim left yesterday open)
   for (const rep of ['u-ahmed', 'u-mahmoud', 'u-karim']) {
     let prev = 0;
@@ -199,7 +201,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v10';
+  const KEY = 'alsultan-demo-v11';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
