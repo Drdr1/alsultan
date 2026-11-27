@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search, ArrowRight } from './components/icons.jsx';
-import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
+import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, workDay, DAY_START_HOUR, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
@@ -18,12 +18,12 @@ const Greeting = ({ name, children }) => {
 
 /* ================= rep ================= */
 export function RepHome() {
-  const { me, data, summaryOf, nav, stats, closedToday } = useApp();
+  const { me, data, summaryOf, nav, stats, closedToday, pendingClose } = useApp();
   const open = useDialogs();
   const sum = summaryOf(me);
   const today = useToday();
   const overdue = sum.customers.filter((c) => stats.get(c.id).overdue).length;
-  const closed = !!closedToday;
+  const closed = !!closedToday || !!pendingClose;
   return <>
     <Greeting name={me.full_name}>
       <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
@@ -33,17 +33,21 @@ export function RepHome() {
         <Button variant="success" disabled={closed} onClick={() => open({ type: 'collect' })}><Wallet />تسجيل تحصيل</Button>
       </div>
     </Greeting>
-    {closed ? <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-4">
+    {pendingClose ? <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4">
+      <Lock className="size-5 shrink-0 text-danger" />
+      <div className="min-w-0 flex-[1_1_200px] text-sm font-semibold text-danger">مقفلتش يوم {fmtDate(pendingClose + 'T12:00:00')}. قفّله عشان تكمّل شغل.</div>
+      <Button variant="danger" className="max-sm:w-full" onClick={() => open({ type: 'close-day', day: pendingClose })}><Lock />تقفيل اليوم ده</Button>
+    </div> : closedToday ? <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-4">
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background"><Lock className="size-4" /></span>
       <div className="min-w-0 flex-[1_1_240px] text-sm"><div className="font-semibold">اليوم اتقفل الساعة {new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(closedToday.created_at))}</div>
-        <div className="mt-0.5 text-muted-foreground">تحصيل {money(closedToday.collections)} · ورّدت <span className="tnum font-medium text-foreground">{money(closedToday.remitted)}</span> ج.م. تقدر تسجّل تاني من بكرة.</div></div>
+        <div className="mt-0.5 text-muted-foreground">التوريد <span className="tnum font-medium text-foreground">{money(closedToday.remitted)}</span> ج.م · اليوم الجديد من {DAY_START_HOUR} الصبح</div></div>
     </div> : <div className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
       <div className="grid min-w-0 flex-[1_1_260px] grid-cols-3 gap-3 text-sm">
         <div><div className="text-xs text-muted-foreground">تحصيل النهارده</div><div className="tnum font-semibold text-success">{money(today.collections)}</div></div>
         <div><div className="text-xs text-muted-foreground">فواتير النهارده</div><div className="tnum font-semibold">{money(today.invoices)}</div></div>
         <div><div className="text-xs text-muted-foreground">مرتجعات</div><div className="tnum font-semibold">{money(today.returns)}</div></div>
       </div>
-      <Button variant="outline" className="max-sm:w-full" onClick={() => open({ type: 'close-day' })}><Lock />تقفيل اليوم والتوريد</Button>
+      <Button variant="outline" className="max-sm:w-full" onClick={() => open({ type: 'close-day' })}><Lock />تقفيل اليوم</Button>
     </div>}
     {sum.over && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4">
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-danger text-white"><Lock className="size-4" /></span>
@@ -81,7 +85,7 @@ export function AdminHome() {
   const stopped = sums.filter((x) => x.s.over).length;
   const overdueAmt = overdue.reduce((a, c) => a + stats.get(c.id).balance, 0);
   const pendTx = data.transactions.filter((t) => t.status === 'pending').length + data.customers.filter((c) => c.status === 'pending').length, pendAcc = raw.profiles.filter((r) => r.role === 'rep' && !r.active).length;
-  const todayKey = dayKey(); const todayCol = data.transactions.filter((t) => t.kind === 'collection' && t.status === 'approved' && dayKey(t.occurred_at) === todayKey).reduce((a, t) => a + Number(t.amount), 0);
+  const todayKey = workDay(); const todayCol = data.transactions.filter((t) => t.kind === 'collection' && t.status === 'approved' && workDay(t.occurred_at) === todayKey).reduce((a, t) => a + Number(t.amount), 0);
   const recent = data.transactions.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, 6);
   const [q, setQ] = useState('');
   return <>
@@ -295,7 +299,7 @@ const txTitle = (t) => (t.kind === 'invoice' && t.invoice_no ? `فاتورة ر�
 const txSub = (t) => [t.kind === 'invoice' && `تستحق ${fmtDate(dueOf(t))}`, t.note && t.note !== 'رصيد افتتاحي' && t.note].filter(Boolean).join(' · ');
 
 export function CustomerPage({ id }) {
-  const { data, stats, me, nameOf, summaryOf, can, closedToday } = useApp();
+  const { data, stats, me, nameOf, summaryOf, can, closedToday, pendingClose } = useApp();
   const open = useDialogs();
   const [month, setMonth] = useState('all');
   const c = data.customers.find((x) => x.id === id);
@@ -313,7 +317,7 @@ export function CustomerPage({ id }) {
   const shown = rows.filter((x) => month === 'all' || monthKey(x.t.occurred_at) === month).reverse();
   const pending = s.list.filter((t) => t.status === 'pending');
   const waiting = c.status === 'pending';
-  const locked = waiting || (isRep && !!closedToday);
+  const locked = waiting || (isRep && (!!closedToday || !!pendingClose));
   return <>
     <Card className={cn(s.overdue && 'border-danger/40')}>
       <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-5">
@@ -556,11 +560,11 @@ export function SettingsPage() {
 /* ================= daily debt report (any day from the calendar) ================= */
 export function ReportPage() {
   const { data, reps, agencyName, agency, go } = useApp();
-  const todayK = dayKey();
+  const todayK = workDay();
   const [day, setDay] = useState(todayK);
   const isToday = day === todayK;
-  const end = new Date(day + 'T23:59:59.999').getTime();
-  const onDay = (t) => dayKey(t.occurred_at) === day;
+  const end = new Date(day + 'T00:00:00').getTime() + DAY + DAY_START_HOUR * 3600000; // the work day ends 6 AM next morning
+  const onDay = (t) => workDay(t.occurred_at) === day;
   const rows = reps.filter((r) => r.active).map((r) => {
     const tx = data.transactions.filter((t) => t.rep_id === r.id && t.status === 'approved');
     const total = tx.filter((t) => new Date(t.occurred_at).getTime() <= end).reduce((a, t) => a + effect(t), 0); // debt at the end of that day

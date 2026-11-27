@@ -27,6 +27,17 @@ export const KIND = { opening: 'رصيد افتتاحي', invoice: 'فاتورة
 // Admin permissions an owner can give a manager (owners have all of them).
 export const PERMS = { credit: 'تعديل حد الائتمان', review: 'التصحيح والمرتجعات', coding: 'تكويد العملاء' };
 export const dayKey = (d = Date.now()) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+// A work day runs 6 AM to 6 AM (some reps work at night): late-night entries belong to the day before.
+export const DAY_START_HOUR = 6;
+export const workDay = (d = Date.now()) => dayKey(new Date(d).getTime() - DAY_START_HOUR * 3600000);
+// The oldest past work day (last 14) where the rep did something but never closed it. Until it is closed he can't work.
+export function pendingCloseDay(closings, txs, repId, now = Date.now()) {
+  const today = workDay(now), from = workDay(now - 14 * DAY);
+  const closed = new Set((closings || []).filter((x) => x.rep_id === repId).map((x) => x.day));
+  const days = [...new Set(txs.filter((t) => t.rep_id === repId && t.created_by === repId).map((t) => workDay(t.created_at)))]
+    .filter((d) => d < today && d >= from && !closed.has(d)).sort();
+  return days[0] || null;
+}
 export const dueOf = (t) => new Date(t.occurred_at).getTime() + (TERM_DAYS - 1) * DAY; // last day of the term for an invoice
 export const TYPE = { retail: 'قطاعي', wholesale: 'جملة' };
 export const REP_TYPE = { retail: 'مندوب قطاعي', wholesale: 'مندوب جملة' };
@@ -163,10 +174,10 @@ export function demoSeed() {
   for (const rep of ['u-ahmed', 'u-mahmoud', 'u-karim']) {
     for (let d = 7; d <= 28; d += 7) {
       const day = dayKey(now - d * DAY);
-      const mine = transactions.filter((t) => t.rep_id === rep && t.status === 'approved' && dayKey(t.occurred_at) === day);
+      const mine = transactions.filter((t) => t.rep_id === rep && t.status === 'approved' && workDay(t.occurred_at) === day);
       const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
       const col = sum('collection');
-      closings.push({ id: uid(), rep_id: rep, day, collections: col, invoices: sum('invoice'), returns: sum('return'), remitted: rep === 'u-karim' && d === 7 ? col - 1500 : col, note: rep === 'u-karim' && d === 7 ? 'باقي 1500 مع المندوب' : '', created_at: at(d, 19) });
+      closings.push({ id: uid(), rep_id: rep, day, collections: col, invoices: sum('invoice'), returns: sum('return'), remitted: col, note: '', created_at: at(d, 19) });
     }
   }
   const agencies = [{ id: 'ag-tiger', name: 'تايجر', created_at: at(120) }, { id: 'ag-molfix', name: 'مولفيكس', created_at: at(120) }];
@@ -174,7 +185,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v8';
+  const KEY = 'alsultan-demo-v9';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -212,7 +223,8 @@ export function DemoBackend() {
     if (!repVisible(m, cust.rep_id)) throw new Error('العميل ده مش بتاعك');
     if ((cust.status || 'approved') !== 'approved' && !input.fromCoding) throw new Error('العميل ده لسه مستني التكويد');
     const isAdmin = m.role === 'admin';
-    if (!isAdmin && db.closings.some((x) => x.rep_id === m.id && x.day === dayKey())) throw new Error('اليوم اتقفل، تقدر تسجّل من بكرة');
+    if (!isAdmin && db.closings.some((x) => x.rep_id === m.id && x.day === workDay())) throw new Error('اليوم اتقفل، تقدر تسجّل من 6 الصبح');
+    if (!isAdmin) { const p = pendingCloseDay(db.closings, db.transactions, m.id); if (p) throw new Error(`لازم تقفل يوم ${p} الأول`); }
     if (isAdmin && (input.kind === 'correction' || input.kind === 'return') && !hasPerm(m, 'review')) throw new Error('التصحيح والمرتجعات محتاجين صلاحية');
     const amount = Number(input.amount);
     if (!amount || (input.kind !== 'correction' && amount <= 0)) throw new Error('اكتب مبلغ صحيح');
@@ -306,14 +318,15 @@ export function DemoBackend() {
       c.reviewed_by = m.id; c.reviewed_at = new Date().toISOString();
       commit({ table: 'customers', type: 'UPDATE', row: c });
     },
-    async closeDay({ remitted, note }) {
+    async closeDay({ day: wanted, note } = {}) {
       const m = requireActive(); if (m.role !== 'rep') throw new Error('التقفيل للمندوب بس');
-      const day = dayKey();
+      const p = pendingCloseDay(db.closings, db.transactions, m.id);
+      const day = p || workDay();
+      if (wanted && wanted !== day) throw new Error(`لازم تقفل يوم ${day} الأول`);
       if (db.closings.some((x) => x.rep_id === m.id && x.day === day)) throw new Error('اليوم متقفل قبل كده');
-      const mine = db.transactions.filter((t) => t.rep_id === m.id && t.status !== 'rejected' && dayKey(t.created_at) === day);
+      const mine = db.transactions.filter((t) => t.rep_id === m.id && t.created_by === m.id && t.status !== 'rejected' && workDay(t.created_at) === day);
       const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
-      const r = Number(remitted); if (!(r >= 0)) throw new Error('اكتب المبلغ اللي اتورّد');
-      const x = { id: uid(), rep_id: m.id, day, collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), remitted: r, note: (note || '').trim(), created_at: new Date().toISOString() };
+      const x = { id: uid(), rep_id: m.id, day, collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), remitted: sum('collection'), note: (note || '').trim(), created_at: new Date().toISOString() };
       db.closings.push(x); commit({ table: 'day_closings', type: 'INSERT', row: x }); return x;
     },
     async addTransaction(input) { const tx = insertTx(input); commit({ table: 'transactions', type: 'INSERT', row: tx }); return tx; },
@@ -395,7 +408,7 @@ export async function SupabaseBackend() {
       fail(error); return data;
     },
     async codeCustomer(id, approve, code) { const { error } = await sb.rpc('code_customer', { p_id: id, p_approve: !!approve, p_code: code || null }); fail(error); },
-    async closeDay({ remitted, note }) { const { data, error } = await sb.from('day_closings').insert({ remitted, note: note || null }).select().single(); fail(error); return data; },
+    async closeDay({ day, note } = {}) { const { data, error } = await sb.from('day_closings').insert({ day: day || null, note: note || null }).select().single(); fail(error); return data; },
     async addTransaction(t) {
       const row = { customer_id: t.customer_id, rep_id: t.rep_id, kind: t.kind, amount: t.amount, note: t.note || null, corrects_id: t.corrects_id || null, invoice_no: t.invoice_no || null };
       const { data, error } = await sb.from('transactions').insert(row).select().single(); fail(error); return data;

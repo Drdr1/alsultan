@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import { CalendarClock } from './icons.jsx';
-import { money, parseAmount, fmtDate, TERM_DAYS, DAY } from '../lib/core.js';
+import { money, parseAmount, fmtDate, TERM_DAYS, DAY, workDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Dialog, Button, Input, MoneyInput, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
 
@@ -17,7 +17,7 @@ export function DialogsProvider({ children }) {
     {d?.type === 'customer' && <AddCustomerDialog onClose={close} />}
     {d?.type === 'correction' && <CorrectionDialog id={d.id} onClose={close} />}
     {d?.type === 'return' && <ReturnDialog id={d.id} onClose={close} />}
-    {d?.type === 'close-day' && <CloseDayDialog onClose={close} />}
+    {d?.type === 'close-day' && <CloseDayDialog day={d.day} onClose={close} />}
   </Ctx.Provider>;
 }
 
@@ -188,34 +188,28 @@ function ReturnDialog({ id, onClose }) {
 }
 
 // Daily closing: the rep confirms the day's totals and the cash he handed in. After that, nothing more today.
-export function useToday() {
+export function useToday(day) {
   const { data, me } = useApp();
-  const day = new Date().toDateString();
-  const mine = data.transactions.filter((t) => t.rep_id === me.id && t.status !== 'rejected' && new Date(t.created_at).toDateString() === day);
+  const d = day || workDay();
+  const mine = data.transactions.filter((t) => t.rep_id === me.id && t.created_by === me.id && t.status !== 'rejected' && workDay(t.created_at) === d);
   const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
   return { collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), count: mine.length };
 }
 
-function CloseDayDialog({ onClose }) {
+function CloseDayDialog({ day, onClose }) {
   const { api, toast } = useApp();
-  const t = useToday();
-  const { busy, error, submit } = useSubmit(async (fd) => {
-    const remitted = parseAmount(fd.get('remitted') || '0');
-    if (!(remitted >= 0)) throw new Error('اكتب المبلغ اللي ورّدته بالأرقام');
-    await api.closeDay({ remitted, note: fd.get('note') });
-    toast('تم تقفيل اليوم');
-  }, onClose);
-  return <Dialog open onClose={onClose} title="تقفيل اليوم" description="بعد التقفيل مش هتقدر تسجّل تاني النهارده.">
+  const t = useToday(day);
+  const past = day && day !== workDay();
+  const { busy, error, submit } = useSubmit(async () => { await api.closeDay({ day }); toast('تم التقفيل'); }, onClose);
+  return <Dialog open onClose={onClose} title={past ? `تقفيل يوم ${fmtDate(day + 'T12:00:00')}` : 'تقفيل اليوم'} description={past ? undefined : 'بعد التقفيل مش هتقدر تسجّل تاني لحد 6 الصبح.'}>
     <form onSubmit={submit} className="grid gap-4" noValidate>
       <div className="grid gap-2">
-        <Context label="تحصيل النهارده" value={t.collections} tone="text-success" />
-        <Context label="فواتير النهارده" value={t.invoices} />
-        <Context label="مرتجعات النهارده" value={t.returns} />
+        <Context label="التحصيل = التوريد" value={t.collections} tone="text-success" />
+        <Context label="فواتير" value={t.invoices} />
+        <Context label="مرتجعات" value={t.returns} />
       </div>
-      <Field label="المبلغ اللي ورّدته للشركة"><AmountInput name="remitted" defaultValue={money(t.collections)} /></Field>
-      <Field label="ملاحظة (اختياري)"><Input name="note" placeholder="مثلاً: شيك بـ 5,000 هيتورّد بكرة" /></Field>
       <FormError>{error}</FormError>
-      <div className="flex gap-2"><Button type="submit" variant="danger" className="flex-1" size="lg" disabled={busy}>تقفيل اليوم نهائياً</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
+      <div className="flex gap-2"><Button type="submit" variant="danger" className="flex-1" size="lg" disabled={busy}>تقفيل نهائي</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
   </Dialog>;
 }

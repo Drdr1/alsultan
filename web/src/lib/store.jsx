@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner, hasPerm, dayKey } from './core.js';
+import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner, hasPerm, workDay, pendingCloseDay } from './core.js';
 import { useToast } from '../components/ui.jsx';
 import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
@@ -103,8 +103,8 @@ export function AppProvider({ children }) {
   // Reps who logged no invoice and no collection today (checked from IDLE_HOUR in the evening).
   const idleReps = useMemo(() => {
     const now = new Date(); if (now.getHours() < IDLE_HOUR) return [];
-    const today = now.toDateString();
-    const busy = new Set(raw.transactions.filter((t) => (t.kind === 'invoice' || t.kind === 'collection') && new Date(t.created_at).toDateString() === today).map((t) => t.rep_id));
+    const today = workDay(now);
+    const busy = new Set(raw.transactions.filter((t) => (t.kind === 'invoice' || t.kind === 'collection') && workDay(t.created_at) === today).map((t) => t.rep_id));
     return raw.profiles.filter((p) => p.role === 'rep' && p.active && !busy.has(p.id));
   }, [raw, stats]);
   useEffect(() => {
@@ -164,7 +164,8 @@ export function AppProvider({ children }) {
   const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [], closings: [] }); setView({ name: 'home' }); setStack([]); };
 
   const can = useCallback((k) => hasPerm(me, k), [me]);
-  const closedToday = me?.role === 'rep' ? (raw.closings || []).find((x) => x.rep_id === me.id && x.day === dayKey()) || null : null;
-  const value = { api, boot, me, owner, can, closedToday, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const closedToday = me?.role === 'rep' ? (raw.closings || []).find((x) => x.rep_id === me.id && x.day === workDay()) || null : null;
+  const pendingClose = me?.role === 'rep' ? pendingCloseDay(raw.closings, raw.transactions, me.id) : null; // eslint-disable-line react-hooks/exhaustive-deps
+  const value = { api, boot, me, owner, can, closedToday, pendingClose, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

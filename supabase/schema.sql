@@ -238,8 +238,22 @@ drop trigger if exists customers_guard_upd on public.customers;
 create trigger customers_guard_upd before update on public.customers
   for each row execute function public.guard_customer_update();
 
+-- A work day runs 6 AM to 6 AM Cairo time (some reps work at night).
+create or replace function public.work_day(ts timestamptz) returns date
+language sql immutable as $$ select ((ts at time zone 'Africa/Cairo') - interval '6 hours')::date $$;
 create or replace function public.cairo_today() returns date
-language sql stable as $$ select (now() at time zone 'Africa/Cairo')::date $$;
+language sql stable as $$ select public.work_day(now()) $$;
+
+-- Oldest past work day (last 14) where this rep entered something and never closed it.
+create or replace function public.pending_close_day(rid uuid) returns date
+language plpgsql stable security definer set search_path = public as $$
+begin
+  return (select min(public.work_day(t.created_at)) from public.transactions t
+   where t.rep_id = rid and t.created_by = rid
+     and public.work_day(t.created_at) < public.cairo_today()
+     and public.work_day(t.created_at) >= public.cairo_today() - 14
+     and not exists (select 1 from public.day_closings c where c.rep_id = rid and c.day = public.work_day(t.created_at)));
+end $$;
 
 -- Daily closing: the rep confirms the day and the cash handed in (توريد). After it, no more entries that day.
 create table if not exists public.day_closings (
@@ -249,7 +263,7 @@ create table if not exists public.day_closings (
   collections  numeric(14,2) not null default 0,
   invoices     numeric(14,2) not null default 0,
   returns      numeric(14,2) not null default 0,
-  remitted     numeric(14,2) not null check (remitted >= 0),
+  remitted     numeric(14,2) not null default 0 check (remitted >= 0),
   note         text,
   created_at   timestamptz not null default now(),
   unique (rep_id, day)
@@ -314,7 +328,10 @@ begin
   if me.role = 'admin' and not public.can_manage_rep(cust.rep_id) then raise exception 'العميل ده مش في توكيلك'; end if;
   if cust.status <> 'approved' then raise exception 'العميل ده لسه مستني التكويد'; end if;
   if me.role <> 'admin' and exists (select 1 from public.day_closings where rep_id = me.id and day = public.cairo_today()) then
-    raise exception 'اليوم اتقفل، تقدر تسجّل من بكرة';
+    raise exception 'اليوم اتقفل، تقدر تسجّل من 6 الصبح';
+  end if;
+  if me.role <> 'admin' and public.pending_close_day(me.id) is not null then
+    raise exception 'لازم تقفل يوم % الأول', public.pending_close_day(me.id);
   end if;
   if me.role = 'admin' and new.kind in ('correction','return') and not public.has_perm('review') then
     raise exception 'التصحيح والمرتجعات محتاجين صلاحية';
@@ -420,7 +437,8 @@ begin
   select * into me from public.profiles where id = auth.uid();
   if me.id is null or not me.active or me.role <> 'rep' then raise exception 'التقفيل للمندوب بس'; end if;
   new.rep_id := me.id;
-  new.day := public.cairo_today();
+  -- an unclosed past day must be closed first, otherwise today
+  new.day := coalesce(public.pending_close_day(me.id), public.cairo_today());
   new.created_at := now();
   -- totals always come from the ledger, never from the phone
   select coalesce(sum(amount) filter (where kind = 'collection'), 0),
@@ -428,7 +446,8 @@ begin
          coalesce(sum(amount) filter (where kind = 'return'), 0)
     into new.collections, new.invoices, new.returns
     from public.transactions
-   where rep_id = me.id and status <> 'rejected' and (created_at at time zone 'Africa/Cairo')::date = new.day;
+   where rep_id = me.id and created_by = me.id and status <> 'rejected' and public.work_day(created_at) = new.day;
+  new.remitted := new.collections; -- the cash handed in is the day's collections
   return new;
 end $$;
 drop trigger if exists closings_guard_ins on public.day_closings;
