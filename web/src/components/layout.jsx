@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings, FileText } from './icons.jsx';
-import { TERM_DAYS, money, REP_TYPE } from '../lib/core.js';
+import { TERM_DAYS, money, REP_TYPE, fmtDate } from '../lib/core.js';
 import { permission, enableNotifications, isIOS, isStandalone, canInstall, install, onPWAChange } from '../lib/notify.js';
 import { useApp } from '../lib/store.jsx';
 import { Avatar, Badge, Button, Select, cn } from './ui.jsx';
@@ -78,11 +78,12 @@ const SHORT = { home: 'الرئيسية', approvals: 'الطلبات', accounts:
 const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'الطلبات (تصحيح، مرتجع، تكويد)', accounts: 'حسابات جديدة', report: 'تقرير المديونية', settings: 'الإعدادات والصلاحيات' };
 
 function BellMenu() {
-  const { overdue, go, me, nameOf, stats, overLimit, idleReps, agency } = useApp();
+  const { overdue, go, me, nameOf, stats, overLimit, idleReps, unclosedReps, agency } = useApp();
   const mineAg = (r) => me.role !== 'admin' || agency === 'all' || r.agency_id === agency;
   const reps = overLimit.filter(({ r }) => mineAg(r));
   const idle = me.role === 'admin' ? idleReps.filter(mineAg) : [];
-  const count = overdue.length + reps.length + idle.length;
+  const unc = me.role === 'admin' ? unclosedReps.filter((x) => mineAg(x.r)) : [];
+  const count = overdue.length + reps.length + idle.length + unc.length;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => { const h = (e) => !ref.current?.contains(e.target) && setOpen(false); document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
@@ -99,6 +100,10 @@ function BellMenu() {
         {reps.map(({ r, s }) => <button key={r.id} onClick={() => { setOpen(false); if (me.role === 'admin') go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-warning" />
           <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{r.id === me.id ? 'انت' : r.full_name}</span><span className="shrink-0 text-xs font-medium text-warning">عدّى حد الائتمان</span></span><span className="block text-xs text-muted-foreground">المديونية {money(s.total)} من {money(s.limit)} ج.م</span></span>
+        </button>)}
+        {unc.map(({ r, day }) => <button key={'u' + r.id} onClick={() => { setOpen(false); go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
+          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-warning" />
+          <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{r.full_name}</span><span className="shrink-0 text-xs font-medium text-warning">مقفلش يومه</span></span><span className="block text-xs text-muted-foreground">مفتوح من {fmtDate(day + 'T12:00:00')}</span></span>
         </button>)}
         {idle.map((r) => <button key={'i' + r.id} onClick={() => { setOpen(false); go({ name: 'rep', id: r.id }); }} className="flex w-full items-start gap-3 rounded-md p-2.5 text-start hover:bg-muted">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-muted-foreground" />

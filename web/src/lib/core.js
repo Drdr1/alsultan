@@ -27,17 +27,27 @@ export const KIND = { opening: 'رصيد افتتاحي', invoice: 'فاتورة
 // Admin permissions an owner can give a manager (owners have all of them).
 export const PERMS = { credit: 'تعديل حد الائتمان', review: 'التصحيح والمرتجعات', coding: 'تكويد العملاء' };
 export const dayKey = (d = Date.now()) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
-// A work day runs 6 AM to 6 AM (some reps work at night): late-night entries belong to the day before.
-export const DAY_START_HOUR = 6;
-export const workDay = (d = Date.now()) => dayKey(new Date(d).getTime() - DAY_START_HOUR * 3600000);
-// The oldest past work day (last 14) where the rep did something but never closed it. Until it is closed he can't work.
-export function pendingCloseDay(closings, txs, repId, now = Date.now()) {
-  const today = workDay(now), from = workDay(now - 14 * DAY);
-  const closed = new Set((closings || []).filter((x) => x.rep_id === repId).map((x) => x.day));
-  const days = [...new Set(txs.filter((t) => t.rep_id === repId && t.created_by === repId).map((t) => workDay(t.created_at)))]
-    .filter((d) => d < today && d >= from && !closed.has(d)).sort();
-  return days[0] || null;
+// A rep's day has no fixed hours: it stays open until he closes it, and the next day starts right after.
+const ms = (x) => new Date(x).getTime();
+const repClosings = (closings, repId) => (closings || []).filter((x) => x.rep_id === repId).sort((a, b) => ms(a.created_at) - ms(b.created_at));
+export function openDay(closings, txs, repId) {
+  const cl = repClosings(closings, repId), last = cl.length ? ms(cl[cl.length - 1].created_at) : 0;
+  const mine = txs.filter((t) => t.rep_id === repId && t.created_by === repId && t.status !== 'rejected' && ms(t.created_at) > last);
+  const start = mine.reduce((a, t) => (a == null || ms(t.created_at) < a ? ms(t.created_at) : a), null);
+  const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
+  return { last: cl[cl.length - 1] || null, txs: mine, day: start == null ? null : dayKey(start), collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), count: mine.length };
 }
+// Which day a transaction is counted on: the rep's own entries go to the day he closed them in; anything else by its date.
+export function dayLabeler(closings, txs, repId) {
+  const cl = repClosings(closings, repId), open = openDay(closings, txs, repId).day;
+  return (t) => {
+    if (t.created_by !== repId) return dayKey(t.occurred_at);
+    const c = cl.find((x) => ms(x.created_at) >= ms(t.created_at));
+    return c ? c.day : open;
+  };
+}
+// The rep's open day started before today = he didn't close yesterday.
+export const unclosedDay = (closings, txs, repId, now = Date.now()) => { const d = openDay(closings, txs, repId).day; return d && d < dayKey(now) ? d : null; };
 export const dueOf = (t) => new Date(t.occurred_at).getTime() + (TERM_DAYS - 1) * DAY; // last day of the term for an invoice
 export const TYPE = { retail: 'قطاعي', wholesale: 'جملة' };
 export const REP_TYPE = { retail: 'مندوب قطاعي', wholesale: 'مندوب جملة' };
@@ -170,14 +180,18 @@ export function demoSeed() {
   const c1 = customers[0];
   transactions.push({ id: uid(), customer_id: c1.id, rep_id: c1.rep_id, kind: 'return', amount: 3500, note: 'مرتجع 5 كراتين منتهية الصلاحية', status: 'pending', occurred_at: at(0, 10), created_at: at(0, 10), created_by: c1.rep_id });
   customers.push({ id: 'c-new', rep_id: 'u-karim', name: 'ماركت الأمل', owner_name: 'عم شعبان', code: null, status: 'pending', phone: '01099887766', location: 'الجناين - الشلوفة', debt_type: 'retail', agency_id: 'ag-tiger', opening_amount: 4200, opening_date: at(3, 12), created_at: at(0, 9), created_by: 'u-karim' });
-  // daily closings (with the cash handed in) for the past collection days
+  // daily closings for every past day each rep worked (karim left yesterday open)
   for (const rep of ['u-ahmed', 'u-mahmoud', 'u-karim']) {
-    for (let d = 7; d <= 28; d += 7) {
-      const day = dayKey(now - d * DAY);
-      const mine = transactions.filter((t) => t.rep_id === rep && t.status === 'approved' && workDay(t.occurred_at) === day);
+    let prev = 0;
+    for (let d = 90; d >= 1; d--) {
+      if (rep === 'u-karim' && d === 1) continue;
+      const end = ms(at(d, 22));
+      const mine = transactions.filter((t) => t.rep_id === rep && t.created_by === rep && t.status !== 'rejected' && ms(t.created_at) > prev && ms(t.created_at) <= end);
+      if (!mine.length) continue;
       const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
       const col = sum('collection');
-      closings.push({ id: uid(), rep_id: rep, day, collections: col, invoices: sum('invoice'), returns: sum('return'), remitted: col, note: '', created_at: at(d, 19) });
+      closings.push({ id: uid(), rep_id: rep, day: dayKey(Math.min(...mine.map((t) => ms(t.created_at)))), collections: col, invoices: sum('invoice'), returns: sum('return'), remitted: col, note: '', created_at: at(d, 22) });
+      prev = end;
     }
   }
   const agencies = [{ id: 'ag-tiger', name: 'تايجر', created_at: at(120) }, { id: 'ag-molfix', name: 'مولفيكس', created_at: at(120) }];
@@ -185,7 +199,7 @@ export function demoSeed() {
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v9';
+  const KEY = 'alsultan-demo-v10';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
@@ -223,8 +237,6 @@ export function DemoBackend() {
     if (!repVisible(m, cust.rep_id)) throw new Error('العميل ده مش بتاعك');
     if ((cust.status || 'approved') !== 'approved' && !input.fromCoding) throw new Error('العميل ده لسه مستني التكويد');
     const isAdmin = m.role === 'admin';
-    if (!isAdmin && db.closings.some((x) => x.rep_id === m.id && x.day === workDay())) throw new Error('اليوم اتقفل، تقدر تسجّل من 6 الصبح');
-    if (!isAdmin) { const p = pendingCloseDay(db.closings, db.transactions, m.id); if (p) throw new Error(`لازم تقفل يوم ${p} الأول`); }
     if (isAdmin && (input.kind === 'correction' || input.kind === 'return') && !hasPerm(m, 'review')) throw new Error('التصحيح والمرتجعات محتاجين صلاحية');
     const amount = Number(input.amount);
     if (!amount || (input.kind !== 'correction' && amount <= 0)) throw new Error('اكتب مبلغ صحيح');
@@ -318,15 +330,11 @@ export function DemoBackend() {
       c.reviewed_by = m.id; c.reviewed_at = new Date().toISOString();
       commit({ table: 'customers', type: 'UPDATE', row: c });
     },
-    async closeDay({ day: wanted, note } = {}) {
+    async closeDay({ note } = {}) {
       const m = requireActive(); if (m.role !== 'rep') throw new Error('التقفيل للمندوب بس');
-      const p = pendingCloseDay(db.closings, db.transactions, m.id);
-      const day = p || workDay();
-      if (wanted && wanted !== day) throw new Error(`لازم تقفل يوم ${day} الأول`);
-      if (db.closings.some((x) => x.rep_id === m.id && x.day === day)) throw new Error('اليوم متقفل قبل كده');
-      const mine = db.transactions.filter((t) => t.rep_id === m.id && t.created_by === m.id && t.status !== 'rejected' && workDay(t.created_at) === day);
-      const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
-      const x = { id: uid(), rep_id: m.id, day, collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), remitted: sum('collection'), note: (note || '').trim(), created_at: new Date().toISOString() };
+      const o = openDay(db.closings, db.transactions, m.id);
+      if (!o.count) throw new Error('مفيش حاجة تتقفل');
+      const x = { id: uid(), rep_id: m.id, day: o.day, collections: o.collections, invoices: o.invoices, returns: o.returns, remitted: o.collections, note: (note || '').trim(), created_at: new Date().toISOString() };
       db.closings.push(x); commit({ table: 'day_closings', type: 'INSERT', row: x }); return x;
     },
     async addTransaction(input) { const tx = insertTx(input); commit({ table: 'transactions', type: 'INSERT', row: tx }); return tx; },
@@ -408,7 +416,7 @@ export async function SupabaseBackend() {
       fail(error); return data;
     },
     async codeCustomer(id, approve, code) { const { error } = await sb.rpc('code_customer', { p_id: id, p_approve: !!approve, p_code: code || null }); fail(error); },
-    async closeDay({ day, note } = {}) { const { data, error } = await sb.from('day_closings').insert({ day: day || null, note: note || null }).select().single(); fail(error); return data; },
+    async closeDay({ note } = {}) { const { data, error } = await sb.from('day_closings').insert({ note: note || null }).select().single(); fail(error); return data; },
     async addTransaction(t) {
       const row = { customer_id: t.customer_id, rep_id: t.rep_id, kind: t.kind, amount: t.amount, note: t.note || null, corrects_id: t.corrects_id || null, invoice_no: t.invoice_no || null };
       const { data, error } = await sb.from('transactions').insert(row).select().single(); fail(error); return data;

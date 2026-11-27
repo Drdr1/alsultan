@@ -238,24 +238,11 @@ drop trigger if exists customers_guard_upd on public.customers;
 create trigger customers_guard_upd before update on public.customers
   for each row execute function public.guard_customer_update();
 
--- A work day runs 6 AM to 6 AM Cairo time (some reps work at night).
-create or replace function public.work_day(ts timestamptz) returns date
-language sql immutable as $$ select ((ts at time zone 'Africa/Cairo') - interval '6 hours')::date $$;
 create or replace function public.cairo_today() returns date
-language sql stable as $$ select public.work_day(now()) $$;
+language sql stable as $$ select (now() at time zone 'Africa/Cairo')::date $$;
 
--- Oldest past work day (last 14) where this rep entered something and never closed it.
-create or replace function public.pending_close_day(rid uuid) returns date
-language plpgsql stable security definer set search_path = public as $$
-begin
-  return (select min(public.work_day(t.created_at)) from public.transactions t
-   where t.rep_id = rid and t.created_by = rid
-     and public.work_day(t.created_at) < public.cairo_today()
-     and public.work_day(t.created_at) >= public.cairo_today() - 14
-     and not exists (select 1 from public.day_closings c where c.rep_id = rid and c.day = public.work_day(t.created_at)));
-end $$;
-
--- Daily closing: the rep confirms the day and the cash handed in (توريد). After it, no more entries that day.
+-- Daily closing: no fixed hours. The rep's day stays open until he closes it and a new one starts right after.
+-- day = the date of the first entry in that closing; توريد = the collections.
 create table if not exists public.day_closings (
   id           uuid primary key default gen_random_uuid(),
   rep_id       uuid not null default auth.uid() references public.profiles(id),
@@ -265,9 +252,10 @@ create table if not exists public.day_closings (
   returns      numeric(14,2) not null default 0,
   remitted     numeric(14,2) not null default 0 check (remitted >= 0),
   note         text,
-  created_at   timestamptz not null default now(),
-  unique (rep_id, day)
+  created_at   timestamptz not null default now()
 );
+alter table public.day_closings drop constraint if exists day_closings_rep_id_day_key;
+create index if not exists day_closings_rep_idx on public.day_closings(rep_id, created_at);
 
 -- ---------------------------------------------------------------------
 -- Transactions (append-only ledger)
@@ -327,12 +315,6 @@ begin
   if me.role <> 'admin' and cust.rep_id <> me.id then raise exception 'العميل ده مش بتاعك'; end if;
   if me.role = 'admin' and not public.can_manage_rep(cust.rep_id) then raise exception 'العميل ده مش في توكيلك'; end if;
   if cust.status <> 'approved' then raise exception 'العميل ده لسه مستني التكويد'; end if;
-  if me.role <> 'admin' and exists (select 1 from public.day_closings where rep_id = me.id and day = public.cairo_today()) then
-    raise exception 'اليوم اتقفل، تقدر تسجّل من 6 الصبح';
-  end if;
-  if me.role <> 'admin' and public.pending_close_day(me.id) is not null then
-    raise exception 'لازم تقفل يوم % الأول', public.pending_close_day(me.id);
-  end if;
   if me.role = 'admin' and new.kind in ('correction','return') and not public.has_perm('review') then
     raise exception 'التصحيح والمرتجعات محتاجين صلاحية';
   end if;
@@ -437,16 +419,17 @@ begin
   select * into me from public.profiles where id = auth.uid();
   if me.id is null or not me.active or me.role <> 'rep' then raise exception 'التقفيل للمندوب بس'; end if;
   new.rep_id := me.id;
-  -- an unclosed past day must be closed first, otherwise today
-  new.day := coalesce(public.pending_close_day(me.id), public.cairo_today());
   new.created_at := now();
-  -- totals always come from the ledger, never from the phone
-  select coalesce(sum(amount) filter (where kind = 'collection'), 0),
+  -- totals always come from the ledger (everything since his last closing), never from the phone
+  select min(created_at) at time zone 'Africa/Cairo',
+         coalesce(sum(amount) filter (where kind = 'collection'), 0),
          coalesce(sum(amount) filter (where kind = 'invoice'), 0),
          coalesce(sum(amount) filter (where kind = 'return'), 0)
-    into new.collections, new.invoices, new.returns
+    into new.day, new.collections, new.invoices, new.returns
     from public.transactions
-   where rep_id = me.id and created_by = me.id and status <> 'rejected' and public.work_day(created_at) = new.day;
+   where rep_id = me.id and created_by = me.id and status <> 'rejected'
+     and created_at > coalesce((select max(c.created_at) from public.day_closings c where c.rep_id = me.id), '-infinity');
+  if new.day is null then raise exception 'مفيش حاجة تتقفل'; end if;
   new.remitted := new.collections; -- the cash handed in is the day's collections
   return new;
 end $$;

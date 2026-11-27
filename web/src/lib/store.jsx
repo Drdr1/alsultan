@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner, hasPerm, workDay, pendingCloseDay } from './core.js';
+import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner, hasPerm, dayKey, openDay, unclosedDay } from './core.js';
 import { useToast } from '../components/ui.jsx';
 import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
@@ -103,10 +103,21 @@ export function AppProvider({ children }) {
   // Reps who logged no invoice and no collection today (checked from IDLE_HOUR in the evening).
   const idleReps = useMemo(() => {
     const now = new Date(); if (now.getHours() < IDLE_HOUR) return [];
-    const today = workDay(now);
-    const busy = new Set(raw.transactions.filter((t) => (t.kind === 'invoice' || t.kind === 'collection') && workDay(t.created_at) === today).map((t) => t.rep_id));
+    const today = dayKey(now);
+    const busy = new Set(raw.transactions.filter((t) => (t.kind === 'invoice' || t.kind === 'collection') && dayKey(t.created_at) === today).map((t) => t.rep_id));
     return raw.profiles.filter((p) => p.role === 'rep' && p.active && !busy.has(p.id));
   }, [raw, stats]);
+  // Reps whose open day started before today (didn't close yesterday). Not blocked, just reported.
+  const unclosedReps = useMemo(() => raw.profiles.filter((p) => p.role === 'rep' && p.active).map((r) => ({ r, day: unclosedDay(raw.closings, raw.transactions, r.id) })).filter((x) => x.day), [raw]);
+  useEffect(() => {
+    if (!me || me.role !== 'admin' || permission() !== 'granted') return;
+    const fresh = unclosedReps.filter((x) => !notified.current.has('unc-' + x.r.id + x.day));
+    if (!fresh.length) return;
+    fresh.forEach((x) => notified.current.add('unc-' + x.r.id + x.day));
+    try { localStorage.setItem(NKEY, JSON.stringify([...notified.current])); } catch { /* storage blocked */ }
+    if (fresh.length <= 3) fresh.forEach((x) => notify(`${x.r.full_name} مقفلش يومه`, 'اليوم مفتوح من ' + x.day, 'unc-' + x.r.id, '#rep=' + x.r.id));
+    else notify(`${fresh.length} مناديب مقفلوش يومهم`, fresh.map((x) => x.r.full_name).join('، '), 'unc', '#report');
+  }, [unclosedReps, me]);
   useEffect(() => {
     if (!me || me.role !== 'admin' || permission() !== 'granted') return;
     const fresh = idleReps.filter((r) => !notified.current.has('idle-' + r.id));
@@ -164,8 +175,7 @@ export function AppProvider({ children }) {
   const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [], closings: [] }); setView({ name: 'home' }); setStack([]); };
 
   const can = useCallback((k) => hasPerm(me, k), [me]);
-  const closedToday = me?.role === 'rep' ? (raw.closings || []).find((x) => x.rep_id === me.id && x.day === workDay()) || null : null;
-  const pendingClose = me?.role === 'rep' ? pendingCloseDay(raw.closings, raw.transactions, me.id) : null; // eslint-disable-line react-hooks/exhaustive-deps
-  const value = { api, boot, me, owner, can, closedToday, pendingClose, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const myDay = me?.role === 'rep' ? openDay(raw.closings, raw.transactions, me.id) : null;
+  const value = { api, boot, me, owner, can, myDay, overLimit, idleReps, unclosedReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

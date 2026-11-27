@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import { CalendarClock } from './icons.jsx';
-import { money, parseAmount, fmtDate, TERM_DAYS, DAY, workDay } from '../lib/core.js';
+import { money, parseAmount, fmtDate, TERM_DAYS, DAY, openDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Dialog, Button, Input, MoneyInput, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
 
@@ -187,21 +187,17 @@ function ReturnDialog({ id, onClose }) {
   </Dialog>;
 }
 
-// Daily closing: the rep confirms the day's totals and the cash he handed in. After that, nothing more today.
-export function useToday(day) {
+// Daily closing: no fixed hours, the day stays open until the rep closes it; the next day starts right after.
+export function useToday() {
   const { data, me } = useApp();
-  const d = day || workDay();
-  const mine = data.transactions.filter((t) => t.rep_id === me.id && t.created_by === me.id && t.status !== 'rejected' && workDay(t.created_at) === d);
-  const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
-  return { collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), count: mine.length };
+  return openDay(data.closings, data.transactions, me.id);
 }
 
-function CloseDayDialog({ day, onClose }) {
+function CloseDayDialog({ onClose }) {
   const { api, toast } = useApp();
-  const t = useToday(day);
-  const past = day && day !== workDay();
-  const { busy, error, submit } = useSubmit(async () => { await api.closeDay({ day }); toast('تم التقفيل'); }, onClose);
-  return <Dialog open onClose={onClose} title={past ? `تقفيل يوم ${fmtDate(day + 'T12:00:00')}` : 'تقفيل اليوم'} description={past ? undefined : 'بعد التقفيل مش هتقدر تسجّل تاني لحد 6 الصبح.'}>
+  const t = useToday();
+  const { busy, error, submit } = useSubmit(async () => { await api.closeDay(); toast('تم التقفيل'); }, onClose);
+  return <Dialog open onClose={onClose} title={t.day ? `تقفيل يوم ${fmtDate(t.day + 'T12:00:00')}` : 'تقفيل اليوم'}>
     <form onSubmit={submit} className="grid gap-4" noValidate>
       <div className="grid gap-2">
         <Context label="التحصيل = التوريد" value={t.collections} tone="text-success" />
@@ -209,7 +205,7 @@ function CloseDayDialog({ day, onClose }) {
         <Context label="مرتجعات" value={t.returns} />
       </div>
       <FormError>{error}</FormError>
-      <div className="flex gap-2"><Button type="submit" variant="danger" className="flex-1" size="lg" disabled={busy}>تقفيل نهائي</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
+      <div className="flex gap-2"><Button type="submit" variant="danger" className="flex-1" size="lg" disabled={busy || !t.count}>تقفيل نهائي</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
   </Dialog>;
 }
