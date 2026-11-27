@@ -453,7 +453,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['mokhtar', 'محمد مختار', 'محاسب الفرع'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['mokhtar', 'محمد مختار', 'محاسب الفرع'], ['ezzat', 'محمد عزت', 'محاسب'], ['gomaa', 'محمود جمعة', 'محاسب'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
