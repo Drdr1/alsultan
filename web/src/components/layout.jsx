@@ -32,7 +32,7 @@ function NotifyPrompt() {
     <div className="min-w-0 flex-[1_1_240px] text-sm">
       <div className="font-semibold">خلّي التنبيهات توصلك على الموبايل</div>
       {(iosBrowser || perm === 'denied') && <div className="mt-0.5 text-muted-foreground">{iosBrowser
-        ? <>على الآيفون: دوس زرار المشاركة <ShareIcon className="inline size-4 align-text-bottom" /> تحت، واختار «إضافة إلى الشاشة الرئيسية»، وافتح دفتر السلطان من الأيقونة اللي هتظهر، وبعدها فعّل الإشعارات من هنا.</>
+        ? <>دوس <ShareIcon className="inline size-4 align-text-bottom" /> ثم «إضافة إلى الشاشة الرئيسية» وافتحه من الأيقونة.</>
         : perm === 'denied' ? 'الإشعارات مقفولة. افتح إعدادات المتصفح للموقع ده واسمح بالإشعارات.'
         : null}</div>}
     </div>

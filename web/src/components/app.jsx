@@ -51,7 +51,7 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
       </div>
       {showRep && <Segmented value={type} onChange={setType} options={[['all', 'كل المناديب'], ['retail', 'مناديب القطاعي'], ['wholesale', 'مناديب الجملة']]} />}
     </div>
-    {rows.length === 0 ? <Empty icon={Store} title={list.length ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}>{list.length ? 'جرّب كلمة بحث تانية.' : emptyText}</Empty> : <>
+    {rows.length === 0 ? <Empty icon={Store} title={list.length ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}>{list.length ? '' : emptyText}</Empty> : <>
       {/* desktop table */}
       <div className="hidden border-t md:block">
         <Table>
@@ -91,7 +91,7 @@ export function CreditCard({ sum, title = 'حد الائتمان', children }) {
   const stroke = { brand: 'hsl(var(--brand))', warning: 'hsl(var(--warning))', danger: 'hsl(var(--danger))' }[lv];
   return <Card className={cn(sum.over && 'border-danger/40')}>
     <CardHeader>
-      <div><CardTitle>{title}</CardTitle><CardDescription>المديونية الحالية مقابل الحد المسموح</CardDescription></div>
+      <div><CardTitle>{title}</CardTitle></div>
       {sum.over ? <Badge variant="solid">موقوف عن الآجل</Badge> : <Badge variant={lv === 'warning' ? 'warning' : 'success'} dot>{lv === 'warning' ? 'قريب من الحد' : 'داخل الحد'}</Badge>}
     </CardHeader>
     <CardContent>
@@ -168,7 +168,7 @@ export function TrendCard({ txs, weeks = 10 }) {
 export function RepBarsCard({ sums, onOpen }) {
   const rows = sums.map(({ r, s }) => ({ id: r.id, name: r.full_name.split(' ')[0], full: r.full_name, total: s.total, limit: s.limit, over: s.over }));
   return <Card>
-    <CardHeader><div><CardTitle>المديونية حسب المندوب</CardTitle><CardDescription>العمود الأحمر = تجاوز حد الائتمان</CardDescription></div></CardHeader>
+    <CardHeader><div><CardTitle>المديونية حسب المندوب</CardTitle></div></CardHeader>
     <ChartLegend items={[['var(--chart-2)', 'المديونية'], ['hsl(var(--danger))', 'تجاوز الحد'], ['hsl(var(--muted-foreground) / 0.25)', 'حد الائتمان']]} />
     <CardContent className="h-[240px] ps-2">
       <ResponsiveContainer width="100%" height="100%">

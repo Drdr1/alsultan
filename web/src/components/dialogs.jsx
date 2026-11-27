@@ -54,7 +54,7 @@ function CollectDialog({ id, onClose }) {
     await api.addTransaction({ customer_id: c.id, rep_id: c.rep_id, kind: 'collection', amount, note: fd.get('note') });
     toast(`تم تسجيل تحصيل ${money(amount)} ج.م من ${c.name}`);
   }, onClose);
-  return <Dialog open onClose={onClose} title={c && id ? `تحصيل من ${c.name}` : 'تسجيل تحصيل'} description="المبلغ يُخصم من رصيد العميل فوراً ويظهر عند الإدارة لحظياً.">
+  return <Dialog open onClose={onClose} title={c && id ? `تحصيل من ${c.name}` : 'تسجيل تحصيل'} >
     <form onSubmit={submit} className="grid gap-4" noValidate>
       {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
       {s && <Context label="الرصيد الحالي" value={s.balance} />}
@@ -82,7 +82,7 @@ function InvoiceDialog({ id, onClose }) {
     await api.addTransaction({ customer_id: c.id, rep_id: c.rep_id, kind: 'invoice', amount, invoice_no: no, note: fd.get('note') });
     toast(`تم تسجيل فاتورة ${money(amount)} ج.م على ${c.name}`);
   }, onClose);
-  return <Dialog open onClose={onClose} title={c && id ? `فاتورة آجل · ${c.name}` : 'فاتورة آجل جديدة'} description="الفاتورة تزود رصيد العميل ومديونيتك، ومرفوضة لو هتعدي حد الائتمان.">
+  return <Dialog open onClose={onClose} title={c && id ? `فاتورة آجل · ${c.name}` : 'فاتورة آجل جديدة'} >
     <form onSubmit={submit} className="grid gap-4" noValidate>
       {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
       <Context label="المتاح قبل الحد" value={Math.max(0, sum.limit - sum.total)} tone="text-success" />
@@ -113,7 +113,7 @@ function AddCustomerDialog({ onClose }) {
     await api.addCustomer({ name: n, owner_name: owner, phone: fd.get('phone'), location: fd.get('location'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
     toast(direct ? `تمت إضافة ${n}` : `اتبعت طلب تكويد ${n}، وهيتفعّل بعد موافقة الإدارة`);
   }, onClose);
-  return <Dialog open onClose={onClose} title={direct ? 'إضافة عميل جديد' : 'طلب تكويد عميل جديد'} description={direct ? 'سجّل بيانات المحل والمبلغ اللي عليه دلوقتي.' : 'الطلب بيروح للإدارة تديله كود. بعد التكويد تقدر تسجّل عليه فواتير وتحصيل.'} width="max-w-lg">
+  return <Dialog open onClose={onClose} title={direct ? 'إضافة عميل جديد' : 'طلب تكويد عميل جديد'} description={direct ? undefined : 'هيتفعّل بعد التكويد.'} width="max-w-lg">
     <form onSubmit={submit} className="grid gap-4" noValidate>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="اسم المحل"><Input name="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً: ماركت النور" required /></Field>
@@ -147,7 +147,7 @@ function CorrectionDialog({ id, onClose }) {
     toast(admin ? 'تم تطبيق التصحيح' : 'تم إرسال الطلب للإدارة');
   }, onClose);
   return <Dialog open onClose={onClose} title={(admin ? 'تصحيح رصيد · ' : 'طلب تصحيح · ') + c.name}
-    description={admin ? 'التصحيح من الإدارة يُطبق فوراً ويظل ظاهراً في كشف الحساب.' : 'لا يمكن تعديل أو حذف أي حركة. الطلب يذهب للإدارة ويُطبق بعد الموافقة.'}>
+    description={admin ? undefined : 'هيتطبق بعد موافقة الإدارة.'}>
     <form onSubmit={submit} className="grid gap-4" noValidate>
       <Context label="الرصيد الحالي" value={s.balance} />
       <Segmented value={dir} onChange={setDir} options={[['-1', 'تقليل المديونية'], ['1', 'زيادة المديونية']]} className="w-full [&>button]:flex-1 [&>button]:justify-center" />
@@ -175,7 +175,7 @@ function ReturnDialog({ id, onClose }) {
     toast(direct ? `تم تسجيل مرتجع ${money(amount)} ج.م` : 'اتبعت المرتجع للإدارة، وهيتخصم بعد الموافقة');
   }, onClose);
   if (direct && !can('review')) return <Dialog open onClose={onClose} title="مرتجع"><p className="text-sm text-muted-foreground">تسجيل المرتجعات محتاج صلاحية "التصحيح والمرتجعات".</p></Dialog>;
-  return <Dialog open onClose={onClose} title={c && id ? `مرتجع · ${c.name}` : 'تسجيل مرتجع'} description={direct ? 'المرتجع بيقلل مديونية العميل والمندوب، ومش بيتحسب تحصيل.' : 'المرتجع بيروح للإدارة، وبعد الموافقة بيقلل مديونية العميل ومديونيتك. مش بيتحسب تحصيل.'}>
+  return <Dialog open onClose={onClose} title={c && id ? `مرتجع · ${c.name}` : 'تسجيل مرتجع'} description={direct ? undefined : 'هيتخصم بعد موافقة الإدارة.'}>
     <form onSubmit={submit} className="grid gap-4" noValidate>
       {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
       {s && <Context label="الرصيد الحالي" value={s.balance} />}
@@ -205,7 +205,7 @@ function CloseDayDialog({ onClose }) {
     await api.closeDay({ remitted, note: fd.get('note') });
     toast('تم تقفيل اليوم');
   }, onClose);
-  return <Dialog open onClose={onClose} title="تقفيل اليوم" description="بعد التقفيل مش هتقدر تسجّل أي فاتورة أو تحصيل تاني النهارده، ولا ترجع تعدّل التقفيل.">
+  return <Dialog open onClose={onClose} title="تقفيل اليوم" description="بعد التقفيل مش هتقدر تسجّل تاني النهارده.">
     <form onSubmit={submit} className="grid gap-4" noValidate>
       <div className="grid gap-2">
         <Context label="تحصيل النهارده" value={t.collections} tone="text-success" />

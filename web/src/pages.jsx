@@ -47,7 +47,7 @@ export function RepHome() {
     </div>}
     {sum.over && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4">
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-danger text-white"><Lock className="size-4" /></span>
-      <div><div className="font-semibold text-danger">تم إيقاف البيع الآجل</div><p className="mt-0.5 text-sm text-foreground/80">مديونيتك {money(sum.total)} ج.م تجاوزت حد الائتمان ({money(sum.limit)}) بمبلغ {money(sum.total - sum.limit)} ج.م. التحصيل متاح، وبمجرد ما المديونية تنزل تحت الحد هتقدر تسجل فواتير تاني.</p></div>
+      <div><div className="font-semibold text-danger">تم إيقاف البيع الآجل</div><p className="mt-0.5 text-sm text-foreground/80">عديت الحد بـ {money(sum.total - sum.limit)} ج.م. التحصيل متاح.</p></div>
     </div>}
     <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(sum.month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
@@ -60,8 +60,8 @@ export function RepHome() {
       <div className="xl:col-span-3"><TrendCard txs={data.transactions} /></div>
     </div>
     <Card className="pb-5">
-      <CardHeader><div><CardTitle>عملائي</CardTitle><CardDescription>مرتبين حسب التأخير ثم الرصيد</CardDescription></div></CardHeader>
-      <CustomerTable list={sum.customers} onCollect={(id) => open({ type: 'collect', id })} emptyText='اضغط "عميل جديد" لتسجيل أول عميل والمبلغ اللي عليه.' />
+      <CardHeader><div><CardTitle>عملائي</CardTitle></div></CardHeader>
+      <CustomerTable list={sum.customers} onCollect={(id) => open({ type: 'collect', id })}  />
     </Card>
   </>;
 }
@@ -115,13 +115,13 @@ export function AdminHome() {
     </div>
     <div className="grid gap-6 xl:grid-cols-2">
       <Card>
-        <CardHeader><div><CardTitle>أكثر العملاء تأخيراً</CardTitle><CardDescription>تجاوزوا {TERM_DAYS} يوم من الفاتورة</CardDescription></div><Button variant="outline" size="sm" onClick={() => nav('overdue')}>عرض الكل</Button></CardHeader>
+        <CardHeader><div><CardTitle>أكثر العملاء تأخيراً</CardTitle></div><Button variant="outline" size="sm" onClick={() => nav('overdue')}>عرض الكل</Button></CardHeader>
         <CardContent className="grid gap-1">{overdue.length ? overdue.slice(0, 6).map((c) => { const s = stats.get(c.id); return <button key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className="flex items-center gap-3 rounded-md p-2 text-start hover:bg-muted">
           <Avatar name={initials(c.name)} tone="danger" /><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{c.name}</div><div className="text-xs text-muted-foreground">{nameOf(c.rep_id)}</div></div>
           <div className="text-end"><div className="tnum text-sm font-semibold">{money(s.balance)}</div><div className="text-xs text-danger">متأخر {s.overdueDays} يوم</div></div></button>; }) : <Empty icon={Check} title="لا يوجد عملاء متأخرين" />}</CardContent>
       </Card>
       <Card>
-        <CardHeader><div><CardTitle>أحدث التحصيلات</CardTitle><CardDescription>تظهر هنا لحظة تسجيلها من المندوب</CardDescription></div></CardHeader>
+        <CardHeader><div><CardTitle>أحدث التحصيلات</CardTitle></div></CardHeader>
         <CardContent className="grid gap-1">{recent.length ? recent.map((t) => { const c = data.customers.find((x) => x.id === t.customer_id); return <button key={t.id} onClick={() => go({ name: 'customer', id: t.customer_id })} className="flex items-center gap-3 rounded-md p-2 text-start hover:bg-muted">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success"><TrendingDown className="size-4" /></span>
           <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{c?.name}</div><div className="text-xs text-muted-foreground">{nameOf(t.created_by)} · {fmtDT(t.occurred_at)}</div></div>
@@ -138,7 +138,7 @@ function AgenciesCard() {
   const count = (id) => raw.profiles.filter((p) => p.role === 'rep' && p.active && p.agency_id === id).length;
   if (!owner) return null; // managers only see the agencies the owner gave them
   return <Card>
-    <CardHeader><div><CardTitle>التوكيلات</CardTitle><CardDescription>كل مندوب تبع توكيل واحد، وكل توكيل أرقامه لوحده. اختار التوكيل اللي عايز تشوفه.</CardDescription></div>
+    <CardHeader><div><CardTitle>التوكيلات</CardTitle></div>
       {!adding && <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Store />توكيل جديد</Button>}</CardHeader>
     <CardContent className="grid gap-3">
       <div className="flex flex-wrap gap-2">
@@ -161,13 +161,13 @@ export function RepsPage() {
   return <>
     <AgenciesCard />
     {sums.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sums.map(({ r, s }) => <RepCard key={r.id} r={r} s={s} onClick={() => go({ name: 'rep', id: r.id })} />)}</div>
-      : <Card><Empty icon={Users} title="لا يوجد مناديب مفعّلين">فعّل حسابات المناديب من صفحة الحسابات الجديدة، أو اختار توكيل تاني.</Empty></Card>}
+      : <Card><Empty icon={Users} title="لا يوجد مناديب مفعّلين"></Empty></Card>}
   </>;
 }
 
 export function CustomersPage() {
   const { data, view } = useApp();
-  return <Card className="pb-5"><CardHeader><div><CardTitle>كل العملاء</CardTitle><CardDescription>{data.customers.length} عميل عند كل المناديب</CardDescription></div></CardHeader>
+  return <Card className="pb-5"><CardHeader><div><CardTitle>كل العملاء</CardTitle><CardDescription>{data.customers.length} عميل</CardDescription></div></CardHeader>
     <CustomerTable list={data.customers} showRep initialQuery={view.q || ''} /></Card>;
 }
 
@@ -221,9 +221,9 @@ export function ApprovalsPage() {
   const coding = data.customers.filter((c) => c.status === 'pending');
   const done = data.transactions.filter((t) => (t.kind === 'correction' || t.kind === 'return') && t.status !== 'pending' && t.reviewed_at).sort((a, b) => new Date(b.reviewed_at || b.created_at) - new Date(a.reviewed_at || a.created_at)).slice(0, 20);
   return <>
-    <Card><CardHeader><div><CardTitle>طلبات تكويد عملاء جدد</CardTitle><CardDescription>العميل الجديد مش بيتسجل عليه فواتير ولا تحصيل غير بعد ما ياخد كود.</CardDescription></div></CardHeader>
+    <Card><CardHeader><div><CardTitle>تكويد عملاء جدد</CardTitle></div></CardHeader>
       <CardContent className="grid gap-3">{coding.length ? coding.map((c) => <CodingRow key={c.id} c={c} />) : <Empty icon={UserPlus} title="مفيش طلبات تكويد" />}</CardContent></Card>
-    <Card><CardHeader><div><CardTitle>تصحيحات ومرتجعات بانتظار الموافقة</CardTitle><CardDescription>المندوب لا يستطيع تعديل أو حذف أي حركة. التصحيح والمرتجع بيتطبقوا بعد الموافقة بس.</CardDescription></div></CardHeader>
+    <Card><CardHeader><div><CardTitle>تصحيحات ومرتجعات</CardTitle></div></CardHeader>
       <CardContent className="grid gap-3">{pending.length ? pending.map((t) => <RequestRow key={t.id} t={t} />) : <Empty icon={ClipboardCheck} title="لا توجد طلبات معلقة" />}</CardContent></Card>
     {done.length > 0 && <Card><CardHeader><CardTitle>سجل المراجعات</CardTitle></CardHeader><CardContent className="grid gap-3">{done.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
   </>;
@@ -242,7 +242,7 @@ function ActivateRow({ r }) {
       <div className="max-sm:w-full"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency} className="w-full sm:w-40">{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div>
       {can('credit') ? <><div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><MoneyInput name="limit" placeholder="500,000" className="w-full text-end sm:w-48" /></Field></div>
       <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button></>
-        : <p className="text-sm text-muted-foreground">التفعيل محتاج حد ائتمان، وده بيحدده المحاسب أو المدير العام.</p>}
+        : <p className="text-sm text-muted-foreground">التفعيل للمحاسب.</p>}
     </div>
     <FormError>{error}</FormError>
   </form>;
@@ -251,7 +251,7 @@ function ActivateRow({ r }) {
 export function AccountsPage() {
   const { raw } = useApp();
   const list = raw.profiles.filter((r) => r.role === 'rep' && !r.active);
-  return <Card><CardHeader><div><CardTitle>حسابات بانتظار التفعيل</CardTitle><CardDescription>حدد حد الائتمان لكل مندوب ثم فعّل الحساب.</CardDescription></div></CardHeader>
+  return <Card><CardHeader><div><CardTitle>حسابات بانتظار التفعيل</CardTitle></div></CardHeader>
     <CardContent className="grid gap-3">{list.length ? list.map((r) => <ActivateRow key={r.id} r={r} />) : <Empty icon={UserPlus} title="لا توجد حسابات جديدة" />}</CardContent></Card>;
 }
 
@@ -349,7 +349,7 @@ export function CustomerPage({ id }) {
     </Card>
     {waiting && <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand-soft p-4 text-sm"><UserPlus className="mt-0.5 size-5 shrink-0 text-brand" /><div>العميل ده طلب تكويد جديد{Number(c.opening_amount) > 0 && <> برصيد افتتاحي <span className="tnum font-semibold">{money(c.opening_amount)}</span> ج.م</>}. بعد ما ياخد كود من الإدارة هيتسجل رصيده وتقدر تسجّل عليه فواتير وتحصيل.</div></div>}
     {s.openItems.length > 0 && <Card>
-      <CardHeader><div><CardTitle>الفواتير المفتوحة</CardTitle><CardDescription>التحصيل والمرتجع بيسددوا الأقدم الأول. كل فاتورة تستحق بعد {TERM_DAYS} يوم.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>الفواتير المفتوحة</CardTitle></div></CardHeader>
       <ul className="divide-y border-t">{s.openItems.map(({ t, left, due }) => { const late = Date.now() > due + DAY; return <li key={t.id} className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3', late && 'bg-danger-soft/50')}>
         <div className="min-w-0 flex-[1_1_160px]"><div className="font-medium">{txTitle(t)}</div><div className="text-xs text-muted-foreground">بتاريخ {fmtDate(t.occurred_at)}</div></div>
         <div className={cn('text-sm', late ? 'font-semibold text-danger' : 'text-muted-foreground')}>تستحق {fmtDate(due)}{late && ` · متأخرة ${Math.floor((Date.now() - due) / DAY)} يوم`}</div>
@@ -359,7 +359,7 @@ export function CustomerPage({ id }) {
     {pending.length > 0 && <Card><CardHeader><CardTitle>طلبات معلقة</CardTitle></CardHeader><CardContent className="grid gap-3">{pending.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
-        <CardHeader><div><CardTitle>كشف الحساب</CardTitle><CardDescription>{shown.length} حركة · كل حركة بتاريخها ومن سجّلها</CardDescription></div>
+        <CardHeader><div><CardTitle>كشف الحساب</CardTitle><CardDescription>{shown.length} حركة</CardDescription></div>
           <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full sm:w-44"><option value="all">كل الفترات</option>{months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</Select></CardHeader>
         <ul className="divide-y border-t md:hidden">{shown.map(({ t, run }) => { const e = signed(t); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
           <li key={t.id} className={cn('flex items-center gap-3 px-4 py-3', off && 'opacity-60')}>
@@ -390,7 +390,7 @@ export function CustomerPage({ id }) {
         </div>
       </Card>
       <Card>
-        <CardHeader><div><CardTitle>الأرشيف الشهري</CardTitle><CardDescription>محفوظ دائماً ولا يُحذف</CardDescription></div></CardHeader>
+        <CardHeader><div><CardTitle>الأرشيف الشهري</CardTitle></div></CardHeader>
         <CardContent className="grid gap-1">{byMonth.map((m) => <button key={m.k} onClick={() => setMonth(m.k === month ? 'all' : m.k)} className={cn('grid grid-cols-[1fr_auto_auto] items-center gap-4 rounded-md px-3 py-2.5 text-start text-sm', month === m.k ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted/60')}>
           <span className="font-medium">{monthLabel(m.k)}</span>
           <span className="text-end"><span className="block text-[0.75rem] text-muted-foreground">مدين</span><span className="tnum">{money(m.debit)}</span></span>
@@ -411,9 +411,9 @@ function AuthShell({ children }) {
     <div className="relative hidden flex-col items-center justify-center gap-10 overflow-hidden border-s bg-sidebar p-10 pb-16 lg:flex">
       <img src="./logo-banner.jpg" alt="شركة السلطان" className="w-full max-w-md rounded-xl shadow-card" />
       <div className="grid w-full max-w-md gap-6">
-        <div><h2 className="text-3xl font-bold leading-tight tracking-tight">دفتر مديونيات المناديب</h2><p className="mt-3 leading-relaxed text-muted-foreground">تسجيل العملاء والتحصيل اليومي، ومتابعة لحظية للإدارة، وأرشيف كامل لكل حركة لا يُحذف.</p></div>
+        <div><h2 className="text-3xl font-bold leading-tight tracking-tight">دفتر مديونيات المناديب</h2></div>
         <div className="grid grid-cols-2 gap-3">
-          {[[Zap, 'تحديث لحظي', 'بين المندوب والإدارة بدون إعادة تحميل', 'text-brand'], [ShieldCheck, 'حد ائتمان', 'إيقاف تلقائي للآجل عند التجاوز', 'text-success'], [Clock, `أجل ${TERM_DAYS} يوم`, 'تنبيه بالعملاء المتأخرين', 'text-danger'], [Archive, 'أرشيف دائم', 'كل حركة بتاريخها ومن سجّلها', 'text-warning']].map(([I, t, d, c]) => <div key={t} className="rounded-lg border bg-card p-4 shadow-card"><I className={cn('size-5', c)} /><div className="mt-3 text-sm font-semibold">{t}</div><div className="mt-0.5 text-xs text-muted-foreground">{d}</div></div>)}
+          {[[Zap, 'تحديث لحظي', 'بين المندوب والإدارة بدون إعادة تحميل', 'text-brand'], [ShieldCheck, 'حد ائتمان', 'إيقاف تلقائي للآجل عند التجاوز', 'text-success'], [Clock, `أجل ${TERM_DAYS} يوم`, 'تنبيه بالعملاء المتأخرين', 'text-danger'], [Archive, 'أرشيف دائم', 'كل حركة بتاريخها ومن سجّلها', 'text-warning']].map(([I, t, d, c]) => <div key={t} className="rounded-lg border bg-card p-4 shadow-card"><I className={cn('size-5', c)} /><div className="mt-3 text-sm font-semibold">{t}</div></div>)}
         </div>
       </div>
       <p className="absolute inset-x-0 bottom-6 text-center text-xs text-muted-foreground">© {new Date().getFullYear()} السلطان للتوزيع</p>
@@ -431,7 +431,7 @@ export function LoginPage() {
   const signup = useSubmit(async (fd) => { if (ags.length && !fd.get('agency_id')) throw new Error('اختار التوكيل اللي شغال فيه'); if (!fd.get('rep_type')) throw new Error('اختار نوع المندوب: قطاعي ولا جملة'); await api.signUp(String(fd.get('username')), String(fd.get('password')), String(fd.get('full_name')).trim(), String(fd.get('rep_type')), fd.get('agency_id') || null); setTab('login'); setDone('تم إنشاء الحساب. الإدارة هتفعّله وبعدها تقدر تدخل.'); });
   return <AuthShell>
     <img src="./logo-banner.jpg" alt="شركة السلطان" className="w-full rounded-xl lg:hidden" />
-    <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1><p className="mt-1.5 text-sm text-muted-foreground">{tab === 'login' ? 'ادخل باسم المستخدم وكلمة المرور الخاصة بك.' : 'بعد التسجيل تفعّل الإدارة حسابك وتحدد حد الائتمان.'}</p></div>
+    <div><h1 className="text-2xl font-bold tracking-tight">{tab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مندوب'}</h1></div>
     {done && <div className="rounded-md border border-success/30 bg-success-soft px-3 py-2.5 text-[0.875rem] text-success">{done}</div>}
     {tab === 'login' ? <form onSubmit={login.submit} className="grid gap-4">
       <Field label="اسم المستخدم"><Input name="username" autoComplete="username" dir="ltr" required /></Field>
@@ -464,7 +464,7 @@ export function InactivePage() {
   const { me, signOut } = useApp();
   return <AuthShell>
     <span className="inline-flex size-12 items-center justify-center rounded-full bg-warning-soft text-warning"><Clock className="size-6" /></span>
-    <div><h1 className="text-2xl font-bold">أهلاً {me.full_name}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">حسابك بانتظار التفعيل من الإدارة وتحديد حد الائتمان. هذه الصفحة هتتحدث تلقائياً أول ما يتفعل.</p></div>
+    <div><h1 className="text-2xl font-bold">أهلاً {me.full_name}</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">حسابك بانتظار التفعيل من الإدارة.</p></div>
     <Button variant="outline" onClick={signOut}>تسجيل الخروج</Button>
   </AuthShell>;
 }
@@ -528,12 +528,12 @@ export function SettingsPage() {
   const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [], perms: [], title: 'مشرف' }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
   return <>
     <Card>
-      <CardHeader><div><CardTitle>المديرين</CardTitle><CardDescription>اختار لكل مدير التوكيل والنوع اللي يشوفه، والحاجات اللي يقدر يعملها (حد الائتمان، التصحيح والمرتجعات، تكويد العملاء). التعديل بيتحفظ على طول.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>المديرين</CardTitle></div></CardHeader>
       <CardContent className="grid gap-3">
         {managers.length ? managers.map((m) => <ManagerRow key={m.id} m={m} />) : <Empty icon={Users} title="مفيش مديرين لسه" />}
         <div className="grid gap-2 rounded-lg border border-dashed p-4">
           <div className="text-sm font-medium">إضافة مدير</div>
-          <p className="text-xs text-muted-foreground">المدير يعمل حساب من صفحة التسجيل عادي، وبعدين تختاره هنا. (الحسابات اللي عليها عملاء مش بتظهر هنا.)</p>
+          
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex-[1_1_220px]"><Select aria-label="اختار الحساب" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">اختار الحساب…</option>{promotable.map((r) => <option key={r.id} value={r.id}>{r.full_name} (@{r.username})</option>)}</Select></div>
             <Button type="button" disabled={!pick} onClick={promote}><Check />خليه مدير</Button>
@@ -542,12 +542,12 @@ export function SettingsPage() {
       </CardContent>
     </Card>
     <Card>
-      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>كل مندوب تبع توكيل واحد ونوع واحد، وده اللي بيحدد مين من المديرين يشوفه.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>المناديب</CardTitle></div></CardHeader>
       <CardContent className="p-0"><Table><THead><TR><TH>المندوب</TH><TH>التوكيل</TH><TH>النوع</TH><TH className="max-md:hidden">بيشوفه</TH></TR></THead>
         <TBody>{reps.map((r) => <RepAccessRow key={r.id} r={r} />)}</TBody></Table></CardContent>
     </Card>
     <Card>
-      <CardHeader><div><CardTitle>المديرين العامين</CardTitle><CardDescription>بيشوفوا كل التوكيلات، وهما بس اللي يحددوا الصلاحيات ويضيفوا توكيلات.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>المديرين العامين</CardTitle></div></CardHeader>
       <CardContent className="flex flex-wrap gap-3">{owners.map((o) => <div key={o.id} className="flex items-center gap-2 rounded-md border px-3 py-2"><Avatar name={o.full_name.charAt(0)} size="sm" tone="brand" /><span className="text-sm font-medium">{o.full_name}</span></div>)}</CardContent>
     </Card>
   </>;
