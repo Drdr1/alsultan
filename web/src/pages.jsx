@@ -580,25 +580,21 @@ export function ReportPage() {
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h2 className="text-2xl font-bold tracking-tight">تقرير المديونية</h2>
         <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}</p></div>
-      <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto print:hidden">
-        <div className="flex-[1_1_160px]"><Field label="اليوم"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" /></Field></div>
-        {!isToday && <Button variant="outline" onClick={() => setDay(todayK)}>النهارده</Button>}
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:w-auto print:hidden">
+        <div className="min-w-0 overflow-hidden rounded-md"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" className="block w-full min-w-0 appearance-none sm:w-44" /></div>
+        {isToday ? <span /> : <Button variant="outline" onClick={() => setDay(todayK)}>النهارده</Button>}
         <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
       </div>
     </div>
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
       <StatCard label={isToday ? 'إجمالي المديونية' : 'المديونية آخر اليوم'} value={money(total)} sub={`${rows.length} مندوب`} icon={Wallet} />
-      <StatCard label={isToday ? 'تحصيل النهارده' : 'تحصيل اليوم'} value={money(col)} sub={tot('ret') ? `ومرتجعات ${money(tot('ret'))}` : 'من غير المرتجعات'} icon={TrendingDown} tone="success" />
+      <StatCard label={isToday ? 'تحصيل النهارده' : 'تحصيل اليوم'} value={money(col)} sub={tot('ret') ? `مرتجعات ${money(tot('ret'))}` : undefined} icon={TrendingDown} tone="success" />
       <StatCard label="توريدات اليوم" value={money(remitted)} sub={short > 0.009 ? `ناقص ${money(short)} عند اللي قفلوا` : `${closedN} من ${rows.length} قفلوا اليوم`} icon={Archive} tone={short > 0.009 ? 'warning' : undefined} />
       <StatCard label="موقوفين عن البضاعة" value={stopped.length} sub={stopped.length ? stopped.map((x) => x.r.full_name).join('، ') : 'كله تحت الحد'} icon={Lock} tone={stopped.length ? 'danger' : undefined} />
       <StatCard label={isToday ? 'مسجلوش حركة النهارده' : 'مسجلوش حركة اليوم ده'} value={idle.length} sub={idle.length ? idle.map((x) => x.r.full_name).join('، ') : 'كله اشتغل'} icon={Clock} tone={idle.length ? 'warning' : undefined} />
     </div>
-    {stopped.length > 0 && isToday && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm">
-      <Lock className="mt-0.5 size-5 shrink-0 text-danger" />
-      <div>المندوب اللي عدّى حد الائتمان حسابه بيتقفل على الفواتير الجديدة تلقائياً، يعني <span className="font-semibold">ميخدش بضاعة</span> لحد ما يحصّل وينزل تحت الحد. التحصيل مفتوح له عادي.</div>
-    </div>}
     <Card>
-      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>مرتبين من الأقرب للحد. المرتجعات بتقلل المديونية بس مش بتتحسب تحصيل.</CardDescription></div></CardHeader>
+      <CardHeader><CardTitle>المناديب</CardTitle></CardHeader>
       <CardContent className="p-0">{rows.length ? <Table><THead><TR><TH>المندوب</TH><TH className="text-end">المديونية</TH><TH className="text-end">الحد</TH><TH className="text-end">فواتير</TH><TH className="text-end">تحصيل</TH><TH className="text-end">مرتجع</TH><TH className="text-end">توريد</TH><TH>الحالة</TH></TR></THead>
         <TBody>{rows.map(({ r, total, limit, over, pct, inv, col, ret, moves, closing }) => <TR key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => go({ name: 'rep', id: r.id })}>
           <TD><div className="font-medium">{r.full_name}</div><div className="text-xs text-muted-foreground">{REP_TYPE[r.rep_type] || ''}</div></TD>
