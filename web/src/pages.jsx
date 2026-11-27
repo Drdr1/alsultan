@@ -614,7 +614,7 @@ export function ReportPage() {
             {closing?.note && <div className="mt-1 text-xs text-muted-foreground">{closing.note}</div>}</TD>
         </TR>)}</TBody>
           <tfoot><TR className="border-t-2 bg-muted/50 font-bold hover:bg-muted/50">
-            <TD>الإجمالي <span className="text-xs font-normal text-muted-foreground">({rows.length} مندوب)</span></TD>
+            <TD>الإجمالي</TD>
             <TD className="tnum text-end">{money(total)}</TD>
             <TD className="tnum text-end text-muted-foreground">{money(tot('limit'))}</TD>
             <TD className="tnum text-end">{money(tot('inv'))}</TD>
