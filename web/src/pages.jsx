@@ -572,6 +572,8 @@ export function ReportPage() {
   }).sort((a, b) => b.pct - a.pct);
   const tot = (k) => rows.reduce((a, x) => a + (typeof k === 'function' ? k(x) : x[k]), 0);
   const total = tot('total'), col = tot('col'), remitted = tot((x) => Number(x.closing?.remitted) || 0);
+  // shortfall only counts reps who already closed (the others haven't handed in yet)
+  const short = tot((x) => (x.closing ? Math.max(0, x.col - Number(x.closing.remitted)) : 0)), closedN = rows.filter((x) => x.closing).length;
   const stopped = rows.filter((x) => x.over);
   const idle = rows.filter((x) => !x.moves);
   return <>
@@ -587,7 +589,7 @@ export function ReportPage() {
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
       <StatCard label={isToday ? 'إجمالي المديونية' : 'المديونية آخر اليوم'} value={money(total)} sub={`${rows.length} مندوب`} icon={Wallet} />
       <StatCard label={isToday ? 'تحصيل النهارده' : 'تحصيل اليوم'} value={money(col)} sub={tot('ret') ? `ومرتجعات ${money(tot('ret'))}` : 'من غير المرتجعات'} icon={TrendingDown} tone="success" />
-      <StatCard label="توريدات اليوم" value={money(remitted)} sub={col - remitted > 0.009 ? `ناقص ${money(col - remitted)} عن التحصيل` : `${rows.filter((x) => x.closing).length} من ${rows.length} قفلوا اليوم`} icon={Archive} tone={col - remitted > 0.009 ? 'warning' : undefined} />
+      <StatCard label="توريدات اليوم" value={money(remitted)} sub={short > 0.009 ? `ناقص ${money(short)} عند اللي قفلوا` : `${closedN} من ${rows.length} قفلوا اليوم`} icon={Archive} tone={short > 0.009 ? 'warning' : undefined} />
       <StatCard label="موقوفين عن البضاعة" value={stopped.length} sub={stopped.length ? stopped.map((x) => x.r.full_name).join('، ') : 'كله تحت الحد'} icon={Lock} tone={stopped.length ? 'danger' : undefined} />
       <StatCard label={isToday ? 'مسجلوش حركة النهارده' : 'مسجلوش حركة اليوم ده'} value={idle.length} sub={idle.length ? idle.map((x) => x.r.full_name).join('، ') : 'كله اشتغل'} icon={Clock} tone={idle.length ? 'warning' : undefined} />
     </div>
@@ -610,7 +612,17 @@ export function ReportPage() {
             {closing ? <Badge variant="outline">قفل {new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(closing.created_at))}</Badge> : <Badge variant="default">مقفلش</Badge>}
             {!moves && <Badge variant="warning">مفيش حركة</Badge>}</div>
             {closing?.note && <div className="mt-1 text-xs text-muted-foreground">{closing.note}</div>}</TD>
-        </TR>)}</TBody></Table> : <Empty icon={Users} title="لا يوجد مناديب مفعّلين" />}</CardContent>
+        </TR>)}</TBody>
+          <tfoot><TR className="border-t-2 bg-muted/50 font-bold hover:bg-muted/50">
+            <TD>الإجمالي <span className="text-xs font-normal text-muted-foreground">({rows.length} مندوب)</span></TD>
+            <TD className="tnum text-end">{money(total)}</TD>
+            <TD className="tnum text-end text-muted-foreground">{money(tot('limit'))}</TD>
+            <TD className="tnum text-end">{money(tot('inv'))}</TD>
+            <TD className="tnum text-end text-success">{money(col)}</TD>
+            <TD className="tnum text-end">{money(tot('ret'))}</TD>
+            <TD className={cn('tnum text-end', short > 0.009 && 'text-warning')}>{money(remitted)}</TD>
+            <TD className="text-xs font-normal text-muted-foreground">{closedN} من {rows.length} قفلوا{short > 0.009 ? ` · ناقص ${money(short)}` : ''}</TD>
+          </TR></tfoot></Table> : <Empty icon={Users} title="لا يوجد مناديب مفعّلين" />}</CardContent>
     </Card>
   </>;
 }
