@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search, ArrowRight } from './components/icons.jsx';
-import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, dayLabeler, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
+import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, ChevronRight, Search, ArrowRight } from './components/icons.jsx';
+import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, dayLabeler, missingFor, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
-import { MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
+import { Segmented, MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
 import { CustomerTable, CreditCard, TrendCard, RepBarsCard, RepCard, StatCard, DueBadge, initials } from './components/app.jsx';
 
 const Greeting = ({ name, children }) => {
@@ -94,7 +94,7 @@ export function AdminHome() {
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن عميل…" className="ps-9" type="search" />
       </form>
-      <Button variant="outline" onClick={() => nav('report')} className="max-sm:w-full"><FileText />تقرير المديونية</Button>
+      <Button variant="outline" onClick={() => nav('report')} className="max-sm:w-full"><CalendarDays />النتيجة اليومية</Button>
       </div>
     </Greeting>
     {(pendTx > 0 || pendAcc > 0) && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4">
@@ -198,22 +198,32 @@ function RequestRow({ t }) {
   </div>;
 }
 
+function ShopPhoto({ c, className }) {
+  const { api } = useApp();
+  const [src, setSrc] = useState(null);
+  useEffect(() => { let on = true; api.photoUrl?.(c).then((u) => on && setSrc(u)).catch(() => {}); return () => { on = false; }; }, [api, c]);
+  if (!c.photo) return null;
+  return <a href={src || undefined} target="_blank" rel="noreferrer" className={cn('block shrink-0 overflow-hidden rounded-md border bg-muted', className)}>{src && <img src={src} alt={'صورة ' + c.name} className="size-full object-cover" />}</a>;
+}
+
 function CodingRow({ c }) {
   const { api, nameOf, toast, can, data, go } = useApp();
   const next = String(Math.max(1000, ...data.customers.map((x) => Number(x.code) || 0)) + 1);
   const [code, setCode] = useState(next);
   const [busy, setBusy] = useState(false);
+  const miss = missingFor(c);
   const act = async (ok) => { setBusy(true); try { await api.codeCustomer(c.id, ok, code); toast(ok ? `اتكوّد ${c.name} بكود ${code}` : `اترفض طلب ${c.name}`); } catch (e) { toast(e.message, 'err'); } finally { setBusy(false); } };
   return <div className="flex flex-wrap items-center gap-4 rounded-lg border p-4" data-coding={c.id}>
-    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"><UserPlus className="size-4" /></span>
+    {c.photo ? <ShopPhoto c={c} className="size-14" /> : <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"><UserPlus className="size-4" /></span>}
     <div className="min-w-0 flex-[1_1_220px]">
       <div className="flex flex-wrap items-center gap-2"><button className="font-semibold hover:underline" onClick={() => go({ name: 'customer', id: c.id })}>{c.name}</button><span className="text-xs text-muted-foreground">{nameOf(c.created_by)} · {fmtDT(c.created_at)}</span></div>
       <p className="mt-1 text-sm text-muted-foreground">{[c.owner_name, c.location, c.phone].filter(Boolean).join(' · ')}{Number(c.opening_amount) > 0 && <> · رصيد افتتاحي <span className="tnum font-medium text-foreground">{money(c.opening_amount)}</span></>}</p>
+      {miss.length > 0 && <p className="mt-1 text-sm font-medium text-danger">ناقص: {miss.join('، ')}</p>}
     </div>
     {can('coding') ? <div className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 sm:flex sm:w-auto">
       <Input aria-label="كود العميل" value={code} onChange={(e) => setCode(e.target.value)} dir="ltr" className="text-center sm:w-28" />
       <Button size="sm" variant="outline" className="max-sm:h-10" disabled={busy} onClick={() => act(false)}><X />رفض</Button>
-      <Button size="sm" className="max-sm:h-10" disabled={busy} onClick={() => act(true)}><Check />تكويد</Button>
+      <Button size="sm" className="max-sm:h-10" disabled={busy || miss.length > 0} onClick={() => act(true)}><Check />تكويد</Button>
     </div> : <Badge variant="warning" dot>بانتظار المحاسب</Badge>}
   </div>;
 }
@@ -350,7 +360,8 @@ export function CustomerPage({ id }) {
         <div><div className="text-xs text-muted-foreground">آخر تحصيل</div><div className="mt-1 text-base font-semibold sm:text-lg">{s.lastCollection ? fmtDate(s.lastCollection) : '—'}</div></div>
       </div>
     </Card>
-    {waiting && <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand-soft p-4 text-sm"><UserPlus className="mt-0.5 size-5 shrink-0 text-brand" /><div>العميل ده طلب تكويد جديد{Number(c.opening_amount) > 0 && <> برصيد افتتاحي <span className="tnum font-semibold">{money(c.opening_amount)}</span> ج.م</>}. بعد ما ياخد كود من الإدارة هيتسجل رصيده وتقدر تسجّل عليه فواتير وتحصيل.</div></div>}
+    {waiting && <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand-soft p-4 text-sm"><UserPlus className="mt-0.5 size-5 shrink-0 text-brand" /><div>العميل ده طلب تكويد جديد{Number(c.opening_amount) > 0 && <> برصيد افتتاحي <span className="tnum font-semibold">{money(c.opening_amount)}</span> ج.م</>}.</div></div>}
+    {c.photo && <ShopPhoto c={c} className="h-48 w-full sm:w-80" />}
     {s.openItems.length > 0 && <Card>
       <CardHeader><div><CardTitle>الفواتير المفتوحة</CardTitle></div></CardHeader>
       <ul className="divide-y border-t">{s.openItems.map(({ t, left, due }) => { const late = Date.now() > due + DAY; return <li key={t.id} className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3', late && 'bg-danger-soft/50')}>
@@ -558,7 +569,7 @@ export function SettingsPage() {
 
 /* ================= daily debt report (any day from the calendar) ================= */
 export function ReportPage() {
-  const { data, reps, agencyName, agency, go } = useApp();
+  const { data, reps, agencyName, agency, go, nameOf } = useApp();
   const todayK = dayKey();
   const [day, setDay] = useState(todayK);
   const isToday = day === todayK;
@@ -572,7 +583,7 @@ export function ReportPage() {
     const cls = (data.closings || []).filter((x) => x.rep_id === r.id && x.day === day);
     const closing = cls.length ? { ...cls[cls.length - 1], remitted: cls.reduce((a, x) => a + Number(x.remitted), 0) } : null;
     const limit = Number(r.credit_limit) || 0;
-    return { r, total, limit, over: total > limit, pct: limit ? total / limit : 0, inv: sum('invoice'), col: sum('collection'), ret: sum('return'), moves: td.filter((t) => t.kind === 'invoice' || t.kind === 'collection').length, closing };
+    return { r, total, limit, over: total > limit, pct: limit ? total / limit : 0, inv: sum('invoice'), col: sum('collection'), ret: sum('return'), td, moves: td.filter((t) => t.kind === 'invoice' || t.kind === 'collection').length, closing };
   }).sort((a, b) => b.pct - a.pct);
   const tot = (k) => rows.reduce((a, x) => a + (typeof k === 'function' ? k(x) : x[k]), 0);
   const total = tot('total'), col = tot('col'), remitted = tot((x) => Number(x.closing?.remitted) || 0);
@@ -580,13 +591,22 @@ export function ReportPage() {
   const short = tot((x) => (x.closing ? Math.max(0, x.col - Number(x.closing.remitted)) : 0)), closedN = rows.filter((x) => x.closing).length;
   const stopped = rows.filter((x) => x.over);
   const idle = rows.filter((x) => !x.moves);
+  const [tab, setTab] = useState('collection');
+  const repIds = new Set(rows.map((x) => x.r.id));
+  const dayTx = rows.flatMap((x) => x.td).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const newCust = data.customers.filter((c) => repIds.has(c.rep_id) && dayKey(c.created_at) === day).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const shift = (n) => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + n); const k = dayKey(d); setDay(k > todayK ? todayK : k); };
+  const custName = (id) => data.customers.find((c) => c.id === id)?.name || '—';
+  const time = (x) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(x));
+  const list = tab === 'customers' ? null : dayTx.filter((t) => t.kind === tab);
   return <>
     <div className="flex flex-wrap items-end justify-between gap-3">
-      <div><h2 className="text-2xl font-bold tracking-tight">تقرير المديونية</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}</p></div>
-      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:w-auto print:hidden">
+      <div><h2 className="text-2xl font-bold tracking-tight">النتيجة اليومية</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}{!isToday && <> · <button className="font-medium text-brand hover:underline print:hidden" onClick={() => setDay(todayK)}>النهارده</button></>}</p></div>
+      <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 sm:w-auto print:hidden">
+        <Button variant="outline" size="icon" aria-label="اليوم اللي فات" onClick={() => shift(-1)}><ChevronRight /></Button>
         <div className="min-w-0 overflow-hidden rounded-md"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" className="block w-full min-w-0 appearance-none sm:w-44" /></div>
-        {isToday ? <span /> : <Button variant="outline" onClick={() => setDay(todayK)}>النهارده</Button>}
+        <Button variant="outline" size="icon" aria-label="اليوم اللي بعده" disabled={isToday} onClick={() => shift(1)}><ChevronLeft /></Button>
         <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
       </div>
     </div>
@@ -623,6 +643,23 @@ export function ReportPage() {
             <TD className={cn('tnum text-end', short > 0.009 && 'text-warning')}>{money(remitted)}</TD>
             <TD className="text-xs font-normal text-muted-foreground">{closedN} من {rows.length} قفلوا{short > 0.009 ? ` · ناقص ${money(short)}` : ''}</TD>
           </TR></tfoot></Table> : <Empty icon={Users} title="لا يوجد مناديب مفعّلين" />}</CardContent>
+    </Card>
+    <Card>
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3"><CardTitle>حركة اليوم</CardTitle>
+        <div className="max-w-full overflow-x-auto"><Segmented className="[&_button]:whitespace-nowrap [&_button]:px-2.5" value={tab} onChange={setTab} options={[['collection', `تحصيل (${dayTx.filter((t) => t.kind === 'collection').length})`], ['invoice', `فواتير (${dayTx.filter((t) => t.kind === 'invoice').length})`], ['return', `مرتجع (${dayTx.filter((t) => t.kind === 'return').length})`], ['customers', `عملاء جدد (${newCust.length})`]]} /></div></CardHeader>
+      <CardContent className="p-0">
+        {list ? (list.length ? <div className="divide-y">{list.map((t) => <button key={t.id} onClick={() => go({ name: 'customer', id: t.customer_id })} className="flex w-full items-center gap-3 px-4 py-3 text-start hover:bg-muted/50 sm:px-6">
+          <div className="min-w-0 flex-1"><div className="truncate font-medium">{custName(t.customer_id)}</div>
+            <div className="truncate text-xs text-muted-foreground">{nameOf(t.rep_id)} · {time(t.created_at)}{t.invoice_no ? ` · فاتورة ${t.invoice_no}` : ''}</div></div>
+          <div className={cn('tnum shrink-0 font-semibold', t.kind === 'collection' && 'text-success')}>{money(t.amount)}</div>
+        </button>)}
+          <div className="flex items-center justify-between bg-muted/50 px-4 py-3 font-bold sm:px-6"><span>الإجمالي</span><span className="tnum">{money(list.reduce((a, t) => a + Number(t.amount), 0))}</span></div></div>
+          : <Empty icon={CalendarDays} title="مفيش حركة" />)
+          : (newCust.length ? <div className="divide-y">{newCust.map((c) => <button key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className="flex w-full items-center gap-3 px-4 py-3 text-start hover:bg-muted/50 sm:px-6">
+            <div className="min-w-0 flex-1"><div className="truncate font-medium">{c.name}</div><div className="truncate text-xs text-muted-foreground">{[c.owner_name, nameOf(c.rep_id), time(c.created_at)].filter(Boolean).join(' · ')}</div></div>
+            {c.status === 'pending' ? <Badge variant="warning">بانتظار التكويد</Badge> : c.status === 'rejected' ? <Badge variant="outline">مرفوض</Badge> : <Badge variant="outline">كود {c.code}</Badge>}
+          </button>)}</div> : <Empty icon={UserPlus} title="مفيش عملاء جدد" />)}
+      </CardContent>
     </Card>
   </>;
 }

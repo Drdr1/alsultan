@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings, FileText } from './icons.jsx';
+import { LayoutDashboard, Users, Store, AlertTriangle, ClipboardCheck, UserPlus, Bell, LogOut, ChevronLeft, ArrowRight, Zap, Home, Archive, Moon, Sun, ShareIcon, BellRingingIcon as BellRinging, Settings, FileText, CalendarDays } from './icons.jsx';
 import { TERM_DAYS, money, REP_TYPE, fmtDate } from '../lib/core.js';
 import { permission, enableNotifications, isIOS, isStandalone, canInstall, install, onPWAChange } from '../lib/notify.js';
 import { useApp } from '../lib/store.jsx';
@@ -67,7 +67,7 @@ function useNav() {
     ['customers', Store, 'العملاء', 0],
     ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger'],
     ['approvals', ClipboardCheck, 'الطلبات', data.transactions.filter((t) => t.status === 'pending').length + data.customers.filter((c) => c.status === 'pending').length, 'warning'],
-    ['report', FileText, 'تقرير المديونية', 0],
+    ['report', CalendarDays, 'النتيجة اليومية', 0],
     ['accounts', UserPlus, 'حسابات جديدة', raw.profiles.filter((r) => r.role === 'rep' && !r.active).length, 'brand'],
     ...(owner ? [['settings', Settings, 'الإعدادات والصلاحيات', 0]] : []),
   ];
@@ -75,7 +75,7 @@ function useNav() {
 }
 
 const SHORT = { home: 'الرئيسية', approvals: 'الطلبات', accounts: 'الحسابات' };
-const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'الطلبات (تصحيح، مرتجع، تكويد)', accounts: 'حسابات جديدة', report: 'تقرير المديونية', settings: 'الإعدادات والصلاحيات' };
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'الطلبات (تصحيح، مرتجع، تكويد)', accounts: 'حسابات جديدة', report: 'النتيجة', settings: 'الإعدادات والصلاحيات' };
 
 function BellMenu() {
   const { overdue, go, me, nameOf, stats, overLimit, idleReps, unclosedReps, agency } = useApp();
@@ -165,6 +165,7 @@ export function Layout({ children }) {
         </div>
         <div className="hidden w-48 shrink-0 md:block"><AgencyPicker /></div>
         <ThemeToggle />
+        {me.role === 'admin' && <Button variant="outline" size="icon" className="lg:hidden" onClick={() => nav('report')} aria-label="النتيجة اليومية"><CalendarDays /></Button>}
         {me.is_owner && <Button variant="outline" size="icon" className="lg:hidden" onClick={() => nav('settings')} aria-label="الإعدادات"><Settings /></Button>}
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>

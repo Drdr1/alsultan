@@ -166,6 +166,7 @@ create index if not exists customers_rep_idx on public.customers(rep_id);
 alter table public.customers add column if not exists agency_id uuid references public.agencies(id);
 -- shop name is "name"; the person who owns it is owner_name
 alter table public.customers add column if not exists owner_name text;
+alter table public.customers add column if not exists photo text; -- path of the shop photo in storage bucket shop-photos
 -- a rep's new customer is a coding request (pending) until someone with the 'coding' permission gives it a code
 alter table public.customers add column if not exists code text;
 alter table public.customers add column if not exists status text not null default 'approved' check (status in ('pending','approved','rejected'));
@@ -445,15 +446,29 @@ create trigger closings_no_delete before delete on public.day_closings for each 
 -- Add customer in one call (p_debt_type is ignored: the type follows the rep).
 -- From a rep it becomes a coding request; the opening balance is kept and posted when the customer gets a code.
 drop function if exists public.add_customer(text, text, text, text, numeric, timestamptz, uuid);
+-- A customer can only be coded (activated) when everything is filled in, shop photo included.
+create or replace function public.customer_missing(c public.customers) returns text
+language sql immutable as $$
+  select nullif(concat_ws('، ',
+    case when coalesce(trim(c.name), '') = '' then 'اسم المحل' end,
+    case when coalesce(trim(c.owner_name), '') = '' then 'اسم صاحب المحل' end,
+    case when coalesce(trim(c.phone), '') = '' then 'التليفون' end,
+    case when coalesce(trim(c.location), '') = '' then 'العنوان' end,
+    case when coalesce(c.photo, '') = '' then 'صورة المحل' end), '')
+$$;
+
+drop function if exists public.add_customer(text, text, text, text, numeric, timestamptz, uuid, text);
 create or replace function public.add_customer(
   p_name text, p_phone text, p_location text, p_debt_type text,
-  p_opening numeric, p_opening_date timestamptz, p_rep_id uuid default null, p_owner_name text default null
+  p_opening numeric, p_opening_date timestamptz, p_rep_id uuid default null, p_owner_name text default null, p_photo text default null
 ) returns uuid
 language plpgsql security invoker set search_path = public as $$
 declare c public.customers;
 begin
-  insert into public.customers (rep_id, name, owner_name, phone, location, debt_type, opening_amount, opening_date)
-  values (coalesce(p_rep_id, auth.uid()), trim(p_name), nullif(trim(p_owner_name),''), nullif(trim(p_phone),''), nullif(trim(p_location),''), p_debt_type,
+  c.name := trim(p_name); c.owner_name := nullif(trim(p_owner_name),''); c.phone := nullif(trim(p_phone),''); c.location := nullif(trim(p_location),''); c.photo := nullif(p_photo,'');
+  if public.customer_missing(c) is not null then raise exception 'ناقص: %', public.customer_missing(c); end if;
+  insert into public.customers (rep_id, name, owner_name, phone, location, photo, debt_type, opening_amount, opening_date)
+  values (coalesce(p_rep_id, auth.uid()), c.name, c.owner_name, c.phone, c.location, c.photo, p_debt_type,
           greatest(coalesce(p_opening, 0), 0), p_opening_date)
   returning * into c;
   if c.status = 'approved' and c.opening_amount > 0 then
@@ -472,6 +487,7 @@ begin
   select * into c from public.customers where id = p_id;
   if c.id is null or c.status <> 'pending' then raise exception 'الطلب ده اتراجع قبل كده'; end if;
   if p_approve then
+    if public.customer_missing(c) is not null then raise exception 'مينفعش يتكوّد، ناقص: %', public.customer_missing(c); end if;
     if coalesce(trim(p_code), '') = '' then raise exception 'اكتب كود العميل'; end if;
     if exists (select 1 from public.customers where code = trim(p_code)) then raise exception 'الكود ده متسجل لعميل تاني'; end if;
     update public.customers set status = 'approved', code = trim(p_code), reviewed_by = auth.uid(), reviewed_at = now() where id = p_id;
@@ -549,3 +565,18 @@ end $$;
 -- Managers are then set up by the owners from the app's settings page (no SQL needed).
 -- (run in SQL editor; the guard trigger allows it because the SQL editor runs as postgres)
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- Shop photos (Supabase Storage, private bucket). Path: <uploader id>/<file>.jpg
+-- ---------------------------------------------------------------------
+do $$ begin
+  insert into storage.buckets (id, name, public) values ('shop-photos', 'shop-photos', false) on conflict (id) do nothing;
+  drop policy if exists shop_photos_insert on storage.objects;
+  create policy shop_photos_insert on storage.objects for insert to authenticated
+    with check (bucket_id = 'shop-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+  drop policy if exists shop_photos_select on storage.objects;
+  create policy shop_photos_select on storage.objects for select to authenticated
+    using (bucket_id = 'shop-photos' and exists (select 1 from public.customers c where c.photo = storage.objects.name));
+exception when undefined_table or invalid_schema_name or undefined_function then
+  raise notice 'storage schema not found, skipping shop-photos bucket';
+end $$;

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { CalendarClock } from './icons.jsx';
+import { CalendarClock, Camera } from './icons.jsx';
 import { money, parseAmount, fmtDate, TERM_DAYS, DAY, openDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Dialog, Button, Input, MoneyInput, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
@@ -98,19 +98,46 @@ function InvoiceDialog({ id, onClose }) {
   </Dialog>;
 }
 
+// Shop photo from the phone camera, shrunk to a small JPEG before it is saved.
+async function shrink(file, max = 900) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.65);
+  } finally { URL.revokeObjectURL(url); }
+}
+function PhotoPicker({ value, onChange }) {
+  const [err, setErr] = useState('');
+  const pick = async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { setErr(''); onChange(await shrink(f)); } catch { setErr('الصورة مش واضحة، جرّب تاني'); } };
+  return <div className="grid gap-1.5 text-[0.875rem] font-medium">صورة المحل
+    <label className={cn('relative flex cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed bg-muted/40 text-sm text-muted-foreground hover:bg-muted', value ? 'h-40' : 'h-24')}>
+      {value ? <img src={value} alt="صورة المحل" className="size-full object-cover" /> : <span className="inline-flex items-center gap-2"><Camera className="size-5" />صوّر المحل</span>}
+      {value && <span className="absolute bottom-2 end-2 rounded bg-black/60 px-2 py-1 text-xs text-white">تغيير</span>}
+      <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={pick} data-photo />
+    </label>
+    {err && <p className="text-xs text-danger">{err}</p>}
+  </div>;
+}
+
 function AddCustomerDialog({ onClose }) {
   const { api, data, toast, me, can } = useApp();
   const direct = me.role === 'admin' && can('coding');
   const today = new Date().toISOString().slice(0, 10), minD = new Date(Date.now() - 365 * DAY).toISOString().slice(0, 10);
-  const [name, setName] = useState(''); const [phone, setPhone] = useState('');
+  const [name, setName] = useState(''); const [phone, setPhone] = useState(''); const [photo, setPhoto] = useState(null);
   const dup = data.customers.find((c) => (name.trim() && c.name === name.trim()) || (phone.trim().length > 6 && c.phone === phone.trim()));
   const { busy, error, submit } = useSubmit(async (fd) => {
     const n = String(fd.get('name') || '').trim(); if (!n) throw new Error('اكتب اسم المحل');
     const owner = String(fd.get('owner_name') || '').trim(); if (!owner) throw new Error('اكتب اسم صاحب المحل');
+    if (!String(fd.get('phone') || '').trim()) throw new Error('اكتب رقم التليفون');
+    if (!String(fd.get('location') || '').trim()) throw new Error('اكتب العنوان');
+    if (!photo) throw new Error('صوّر المحل');
     const opening = fd.get('opening') ? parseAmount(fd.get('opening')) : 0;
     if (!(opening >= 0)) throw new Error('الرصيد لازم يكون رقم');
     const d = fd.get('opening_date');
-    await api.addCustomer({ name: n, owner_name: owner, phone: fd.get('phone'), location: fd.get('location'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
+    await api.addCustomer({ name: n, owner_name: owner, phone: fd.get('phone'), location: fd.get('location'), photo, opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
     toast(direct ? `تمت إضافة ${n}` : `اتبعت طلب تكويد ${n}، وهيتفعّل بعد موافقة الإدارة`);
   }, onClose);
   return <Dialog open onClose={onClose} title={direct ? 'إضافة عميل جديد' : 'طلب تكويد عميل جديد'} description={direct ? undefined : 'هيتفعّل بعد التكويد.'} width="max-w-lg">
@@ -120,9 +147,10 @@ function AddCustomerDialog({ onClose }) {
         <Field label="اسم صاحب المحل"><Input name="owner_name" placeholder="مثلاً: الحاج سعيد" required /></Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="رقم التليفون"><Input name="phone" inputMode="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
-        <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" /></Field>
+        <Field label="رقم التليفون"><Input name="phone" inputMode="tel" dir="ltr" required value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
+        <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" required /></Field>
       </div>
+      <PhotoPicker value={photo} onChange={setPhoto} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="الرصيد الحالي (عليه كام)"><MoneyInput name="opening" placeholder="0" className="text-end" /></Field>
         <Field label="تاريخ أقدم فاتورة مفتوحة"><Input name="opening_date" type="date" defaultValue={today} min={minD} max={today} /></Field>

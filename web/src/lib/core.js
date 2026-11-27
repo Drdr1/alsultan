@@ -48,6 +48,8 @@ export function dayLabeler(closings, txs, repId) {
 }
 // The rep's open day started before today = he didn't close yesterday.
 export const unclosedDay = (closings, txs, repId, now = Date.now()) => { const d = openDay(closings, txs, repId).day; return d && d < dayKey(now) ? d : null; };
+// Everything a new customer needs before he can be coded (activated).
+export const missingFor = (c) => [!c.name && 'اسم المحل', !c.owner_name && 'اسم صاحب المحل', !c.phone && 'التليفون', !c.location && 'العنوان', !c.photo && 'صورة المحل'].filter(Boolean);
 export const dueOf = (t) => new Date(t.occurred_at).getTime() + (TERM_DAYS - 1) * DAY; // last day of the term for an invoice
 export const TYPE = { retail: 'قطاعي', wholesale: 'جملة' };
 export const REP_TYPE = { retail: 'مندوب قطاعي', wholesale: 'مندوب جملة' };
@@ -304,15 +306,17 @@ export function DemoBackend() {
       }
       return structuredClone({ agencies: db.agencies.filter((a) => a.id === m.agency_id), profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id), closings: db.closings.filter((x) => x.rep_id === m.id) });
     },
-    async addCustomer({ name, owner_name, phone, location, opening, opening_date, rep_id }) {
+    async addCustomer({ name, owner_name, phone, location, photo, opening, opening_date, rep_id }) {
       const m = requireActive();
+      const miss = missingFor({ name: (name || '').trim(), owner_name: (owner_name || '').trim(), phone: (phone || '').trim(), location: (location || '').trim(), photo });
+      if (miss.length) throw new Error('ناقص: ' + miss.join('، '));
       if (m.role === 'admin' && rep_id && !repVisible(m, rep_id)) throw new Error('المندوب ده مش في توكيلك');
       const owner = m.role === 'admin' && rep_id ? db.profiles.find((x) => x.id === rep_id) : m;
       const debt_type = owner?.rep_type || 'retail';
       const agency_id = owner?.agency_id || null;
       // a rep's new customer is a coding request: it waits for someone with the coding permission
       const coded = m.role === 'admin' && hasPerm(m, 'coding');
-      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), owner_name: (owner_name || '').trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, agency_id,
+      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), owner_name: (owner_name || '').trim(), phone: (phone || '').trim(), location: (location || '').trim(), photo, debt_type, agency_id,
         code: coded ? nextCode() : null, status: coded ? 'approved' : 'pending', opening_amount: opening > 0 ? opening : 0, opening_date: opening_date || null, created_at: new Date().toISOString(), created_by: m.id };
       db.customers.push(c);
       if (coded && opening > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: opening, note: 'رصيد افتتاحي', occurred_at: opening_date });
@@ -324,6 +328,7 @@ export function DemoBackend() {
       const c = db.customers.find((x) => x.id === id);
       if (!c || c.status !== 'pending' || !repVisible(m, c.rep_id)) throw new Error('الطلب ده اتراجع قبل كده');
       if (approve) {
+        const miss = missingFor(c); if (miss.length) throw new Error('مينفعش يتكوّد، ناقص: ' + miss.join('، '));
         const k = String(code || '').trim(); if (!k) throw new Error('اكتب كود العميل');
         if (db.customers.some((x) => x.code === k)) throw new Error('الكود ده متسجل لعميل تاني');
         c.status = 'approved'; c.code = k;
@@ -367,6 +372,7 @@ export function DemoBackend() {
       commit({ table: 'profiles', type: 'UPDATE', row: p });
     },
     async listAgencies() { return structuredClone(db.agencies); },
+    async photoUrl(c) { return c?.photo || null; },
     async addAgency(name) {
       const m = requireActive(); if (!isOwner(m)) throw new Error('للمدير العام بس');
       const n = String(name || '').trim(); if (!n) throw new Error('اكتب اسم التوكيل');
@@ -413,8 +419,16 @@ export async function SupabaseBackend() {
       const [agencies, profiles, customers, transactions, closings] = await Promise.all([fetchAll('agencies', 'name'), fetchAll('profiles', 'created_at'), fetchAll('customers', 'created_at'), fetchAll('transactions', 'occurred_at'), fetchAll('day_closings', 'day')]);
       return { agencies, profiles, customers, transactions, closings };
     },
+    async photoUrl(c) { if (!c?.photo) return null; if (c.photo.startsWith('data:')) return c.photo; const { data } = await sb.storage.from('shop-photos').createSignedUrl(c.photo, 3600); return data?.signedUrl || null; },
     async addCustomer(c) {
-      const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null, p_owner_name: c.owner_name || null });
+      let photo = null;
+      if (c.photo) { // upload the shop photo to storage, keep only its path on the customer
+        const blob = await (await fetch(c.photo)).blob();
+        const { data: u } = await sb.auth.getUser();
+        photo = `${u.user.id}/${crypto.randomUUID()}.jpg`;
+        const { error: e } = await sb.storage.from('shop-photos').upload(photo, blob, { contentType: 'image/jpeg' }); fail(e);
+      }
+      const { data, error } = await sb.rpc('add_customer', { p_photo: photo, p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null, p_owner_name: c.owner_name || null });
       fail(error); return data;
     },
     async codeCustomer(id, approve, code) { const { error } = await sb.rpc('code_customer', { p_id: id, p_approve: !!approve, p_code: code || null }); fail(error); },
