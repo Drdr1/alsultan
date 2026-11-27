@@ -51,10 +51,18 @@ alter table public.profiles add column if not exists is_owner boolean not null d
 alter table public.profiles add column if not exists scopes jsonb not null default '[]'::jsonb;
 -- job title shown in the app, e.g. مدير عام / مدير فرع تايجر / مشرف تجزئة / مشرف جملة (set by owners)
 alter table public.profiles add column if not exists title text;
+-- what a manager may do besides looking: 'credit' (change credit limits), 'review' (corrections and returns),
+-- 'coding' (give new customers a code). Owners can do all of it.
+alter table public.profiles add column if not exists perms jsonb not null default '[]'::jsonb;
 
 create or replace function public.is_owner() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active and is_owner);
+$$;
+
+create or replace function public.has_perm(p text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_owner() or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin' and active and perms ? p);
 $$;
 
 -- Is (agency, type) inside the current admin's scopes?
@@ -123,8 +131,12 @@ begin
   elsif auth.uid() is not null then
     -- managers: only reps inside their scopes, never permissions, never move a rep outside their scopes
     if not public.can_manage_rep(old.id) then raise exception 'الحساب ده مش في صلاحياتك'; end if;
-    if new.role <> old.role or new.scopes is distinct from old.scopes or new.title is distinct from old.title then raise exception 'الصلاحيات بيحددها المدير العام بس'; end if;
+    if new.role <> old.role or new.scopes is distinct from old.scopes or new.title is distinct from old.title or new.perms is distinct from old.perms then raise exception 'الصلاحيات بيحددها المدير العام بس'; end if;
     if not public.in_my_scopes(new.agency_id, new.rep_type) then raise exception 'مينفعش تنقل مندوب لحاجة مش في صلاحياتك'; end if;
+  end if;
+  -- credit limits: only owners and whoever has the 'credit' permission (the branch accountant)
+  if auth.uid() is not null and new.credit_limit is distinct from old.credit_limit and not public.has_perm('credit') then
+    raise exception 'تعديل حد الائتمان للمحاسب والمدير العام بس';
   end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('profile', old.id::text, 'update', jsonb_build_object(
@@ -152,6 +164,21 @@ create table if not exists public.customers (
 );
 create index if not exists customers_rep_idx on public.customers(rep_id);
 alter table public.customers add column if not exists agency_id uuid references public.agencies(id);
+-- shop name is "name"; the person who owns it is owner_name
+alter table public.customers add column if not exists owner_name text;
+-- a rep's new customer is a coding request (pending) until someone with the 'coding' permission gives it a code
+alter table public.customers add column if not exists code text;
+alter table public.customers add column if not exists status text not null default 'approved' check (status in ('pending','approved','rejected'));
+alter table public.customers add column if not exists opening_amount numeric(14,2) not null default 0 check (opening_amount >= 0);
+alter table public.customers add column if not exists opening_date timestamptz;
+alter table public.customers add column if not exists reviewed_by uuid references public.profiles(id);
+alter table public.customers add column if not exists reviewed_at timestamptz;
+create unique index if not exists customers_code_key on public.customers(code) where code is not null;
+
+create or replace function public.next_customer_code() returns text
+language sql volatile security definer set search_path = public as $$
+  select (greatest(1000, coalesce(max(code::bigint), 0)) + 1)::text from public.customers where code ~ '^[0-9]{1,15}$';
+$$;
 
 create or replace function public.guard_customer_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -169,6 +196,15 @@ begin
   new.agency_id := (select agency_id from public.profiles where id = new.rep_id);
   new.created_by := me.id;
   new.created_at := now();
+  new.opening_amount := greatest(coalesce(new.opening_amount, 0), 0);
+  new.reviewed_by := null; new.reviewed_at := null;
+  if me.role = 'admin' and public.has_perm('coding') then
+    new.status := 'approved';
+    new.code := coalesce(nullif(trim(new.code), ''), public.next_customer_code());
+  else
+    new.status := 'pending';
+    new.code := null;
+  end if;
   return new;
 end $$;
 
@@ -185,6 +221,14 @@ begin
   end if;
   new.debt_type := coalesce((select rep_type from public.profiles where id = new.rep_id), old.debt_type);
   new.agency_id := (select agency_id from public.profiles where id = new.rep_id);
+  if (new.status, new.code) is distinct from (old.status, old.code) then
+    if not public.has_perm('coding') then raise exception 'تكويد العملاء محتاج صلاحية'; end if;
+    if old.status <> 'pending' and new.status is distinct from old.status then raise exception 'الطلب ده اتراجع قبل كده'; end if;
+    if new.status = 'approved' and coalesce(trim(new.code), '') = '' then raise exception 'اكتب كود العميل'; end if;
+  end if;
+  if new.opening_amount is distinct from old.opening_amount or new.opening_date is distinct from old.opening_date then
+    raise exception 'الرصيد الافتتاحي لا يعدل';
+  end if;
   insert into public.audit_log (entity, entity_id, action, details)
   values ('customer', old.id::text, 'update', jsonb_build_object('before', to_jsonb(old), 'after', to_jsonb(new)));
   return new;
@@ -193,6 +237,23 @@ end $$;
 drop trigger if exists customers_guard_upd on public.customers;
 create trigger customers_guard_upd before update on public.customers
   for each row execute function public.guard_customer_update();
+
+create or replace function public.cairo_today() returns date
+language sql stable as $$ select (now() at time zone 'Africa/Cairo')::date $$;
+
+-- Daily closing: the rep confirms the day and the cash handed in (توريد). After it, no more entries that day.
+create table if not exists public.day_closings (
+  id           uuid primary key default gen_random_uuid(),
+  rep_id       uuid not null default auth.uid() references public.profiles(id),
+  day          date not null default public.cairo_today(),
+  collections  numeric(14,2) not null default 0,
+  invoices     numeric(14,2) not null default 0,
+  returns      numeric(14,2) not null default 0,
+  remitted     numeric(14,2) not null check (remitted >= 0),
+  note         text,
+  created_at   timestamptz not null default now(),
+  unique (rep_id, day)
+);
 
 -- ---------------------------------------------------------------------
 -- Transactions (append-only ledger)
@@ -205,7 +266,7 @@ create table if not exists public.transactions (
   id           uuid primary key default gen_random_uuid(),
   customer_id  uuid not null references public.customers(id),
   rep_id       uuid not null references public.profiles(id),
-  kind         text not null check (kind in ('opening','invoice','collection','correction')),
+  kind         text not null,
   amount       numeric(14,2) not null check (amount <> 0),
   note         text,
   status       text not null default 'approved' check (status in ('approved','pending','rejected')),
@@ -217,18 +278,22 @@ create table if not exists public.transactions (
   reviewed_at  timestamptz,
   constraint positive_unless_correction check (kind = 'correction' or amount > 0)
 );
+-- return = goods sent back: lowers the debt like a collection but is not counted as collection
+alter table public.transactions drop constraint if exists transactions_kind_check;
+alter table public.transactions add constraint transactions_kind_check check (kind in ('opening','invoice','collection','return','correction'));
+alter table public.transactions add column if not exists invoice_no text;
 create index if not exists tx_customer_idx on public.transactions(customer_id, occurred_at);
 create index if not exists tx_rep_idx on public.transactions(rep_id, occurred_at);
 
 create or replace function public.customer_balance(cid uuid) returns numeric
 language sql stable security definer set search_path = public as $$
-  select coalesce(sum(case when kind = 'collection' then -amount else amount end), 0)
+  select coalesce(sum(case when kind in ('collection','return') then -amount else amount end), 0)
   from public.transactions where customer_id = cid and status = 'approved';
 $$;
 
 create or replace function public.rep_balance(rid uuid) returns numeric
 language sql stable security definer set search_path = public as $$
-  select coalesce(sum(case when kind = 'collection' then -amount else amount end), 0)
+  select coalesce(sum(case when kind in ('collection','return') then -amount else amount end), 0)
   from public.transactions where rep_id = rid and status = 'approved';
 $$;
 
@@ -247,6 +312,19 @@ begin
   if cust.id is null then raise exception 'العميل غير موجود'; end if;
   if me.role <> 'admin' and cust.rep_id <> me.id then raise exception 'العميل ده مش بتاعك'; end if;
   if me.role = 'admin' and not public.can_manage_rep(cust.rep_id) then raise exception 'العميل ده مش في توكيلك'; end if;
+  if cust.status <> 'approved' then raise exception 'العميل ده لسه مستني التكويد'; end if;
+  if me.role <> 'admin' and exists (select 1 from public.day_closings where rep_id = me.id and day = public.cairo_today()) then
+    raise exception 'اليوم اتقفل، تقدر تسجّل من بكرة';
+  end if;
+  if me.role = 'admin' and new.kind in ('correction','return') and not public.has_perm('review') then
+    raise exception 'التصحيح والمرتجعات محتاجين صلاحية';
+  end if;
+  if new.kind = 'invoice' then
+    if coalesce(trim(new.invoice_no), '') = '' then raise exception 'اكتب رقم الفاتورة'; end if;
+    new.invoice_no := trim(new.invoice_no);
+  else
+    new.invoice_no := null;
+  end if;
 
   new.rep_id     := cust.rep_id;
   new.created_by := me.id;
@@ -261,18 +339,18 @@ begin
     else
       new.occurred_at := now();
     end if;
-    new.status := case when new.kind = 'correction' then 'pending' else 'approved' end;
+    new.status := case when new.kind in ('correction','return') then 'pending' else 'approved' end;
   else
     new.status := 'approved';
-    new.reviewed_by := case when new.kind = 'correction' then me.id end;
-    new.reviewed_at := case when new.kind = 'correction' then now() end;
+    new.reviewed_by := case when new.kind in ('correction','return') then me.id end;
+    new.reviewed_at := case when new.kind in ('correction','return') then now() end;
   end if;
 
   if new.kind = 'opening' and exists (select 1 from public.transactions where customer_id = new.customer_id and kind = 'opening') then
     raise exception 'الرصيد الافتتاحي متسجل قبل كده';
   end if;
 
-  if new.kind = 'collection' then
+  if new.kind in ('collection','return') then
     bal := public.customer_balance(new.customer_id);
     if new.amount > bal then
       raise exception 'المبلغ (%) أكبر من مديونية العميل (%)', new.amount, bal;
@@ -299,6 +377,10 @@ create or replace function public.guard_tx_update() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() or not public.can_manage_rep(old.rep_id) then raise exception 'السجلات لا تعدل'; end if;
+  if not public.has_perm('review') then raise exception 'مراجعة التصحيح والمرتجعات محتاجة صلاحية'; end if;
+  if old.kind = 'return' and new.status = 'approved' and old.amount > public.customer_balance(old.customer_id) then
+    raise exception 'المرتجع (%) أكبر من مديونية العميل (%)', old.amount, public.customer_balance(old.customer_id);
+  end if;
   if old.status <> 'pending' or new.status not in ('approved','rejected') then
     raise exception 'المسموح فقط مراجعة طلب تصحيح معلق';
   end if;
@@ -331,22 +413,73 @@ create trigger agencies_no_delete before delete on public.agencies for each row 
 drop trigger if exists profiles_no_delete on public.profiles;
 create trigger profiles_no_delete before delete on public.profiles for each row execute function public.block_delete();
 
--- Add customer + opening balance in one call (p_debt_type is ignored: the type follows the rep)
+create or replace function public.guard_closing_insert() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare me public.profiles;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  if me.id is null or not me.active or me.role <> 'rep' then raise exception 'التقفيل للمندوب بس'; end if;
+  new.rep_id := me.id;
+  new.day := public.cairo_today();
+  new.created_at := now();
+  -- totals always come from the ledger, never from the phone
+  select coalesce(sum(amount) filter (where kind = 'collection'), 0),
+         coalesce(sum(amount) filter (where kind = 'invoice'), 0),
+         coalesce(sum(amount) filter (where kind = 'return'), 0)
+    into new.collections, new.invoices, new.returns
+    from public.transactions
+   where rep_id = me.id and status <> 'rejected' and (created_at at time zone 'Africa/Cairo')::date = new.day;
+  return new;
+end $$;
+drop trigger if exists closings_guard_ins on public.day_closings;
+create trigger closings_guard_ins before insert on public.day_closings for each row execute function public.guard_closing_insert();
+create or replace function public.block_update() returns trigger
+language plpgsql as $$ begin raise exception 'التقفيل لا يعدل'; end $$;
+drop trigger if exists closings_no_update on public.day_closings;
+create trigger closings_no_update before update on public.day_closings for each row execute function public.block_update();
+drop trigger if exists closings_no_delete on public.day_closings;
+create trigger closings_no_delete before delete on public.day_closings for each row execute function public.block_delete();
+
+-- Add customer in one call (p_debt_type is ignored: the type follows the rep).
+-- From a rep it becomes a coding request; the opening balance is kept and posted when the customer gets a code.
+drop function if exists public.add_customer(text, text, text, text, numeric, timestamptz, uuid);
 create or replace function public.add_customer(
   p_name text, p_phone text, p_location text, p_debt_type text,
-  p_opening numeric, p_opening_date timestamptz, p_rep_id uuid default null
+  p_opening numeric, p_opening_date timestamptz, p_rep_id uuid default null, p_owner_name text default null
 ) returns uuid
 language plpgsql security invoker set search_path = public as $$
-declare cid uuid;
+declare c public.customers;
 begin
-  insert into public.customers (rep_id, name, phone, location, debt_type)
-  values (coalesce(p_rep_id, auth.uid()), trim(p_name), nullif(trim(p_phone),''), nullif(trim(p_location),''), p_debt_type)
-  returning id into cid;
-  if coalesce(p_opening, 0) > 0 then
+  insert into public.customers (rep_id, name, owner_name, phone, location, debt_type, opening_amount, opening_date)
+  values (coalesce(p_rep_id, auth.uid()), trim(p_name), nullif(trim(p_owner_name),''), nullif(trim(p_phone),''), nullif(trim(p_location),''), p_debt_type,
+          greatest(coalesce(p_opening, 0), 0), p_opening_date)
+  returning * into c;
+  if c.status = 'approved' and c.opening_amount > 0 then
     insert into public.transactions (customer_id, rep_id, kind, amount, note, occurred_at)
-    values (cid, coalesce(p_rep_id, auth.uid()), 'opening', p_opening, 'رصيد افتتاحي', coalesce(p_opening_date, now()));
+    values (c.id, c.rep_id, 'opening', c.opening_amount, 'رصيد افتتاحي', coalesce(c.opening_date, now()));
   end if;
-  return cid;
+  return c.id;
+end $$;
+
+-- Approve (give a code) or refuse a coding request.
+create or replace function public.code_customer(p_id uuid, p_approve boolean, p_code text default null) returns void
+language plpgsql security invoker set search_path = public as $$
+declare c public.customers;
+begin
+  if not public.has_perm('coding') then raise exception 'تكويد العملاء محتاج صلاحية'; end if;
+  select * into c from public.customers where id = p_id;
+  if c.id is null or c.status <> 'pending' then raise exception 'الطلب ده اتراجع قبل كده'; end if;
+  if p_approve then
+    if coalesce(trim(p_code), '') = '' then raise exception 'اكتب كود العميل'; end if;
+    if exists (select 1 from public.customers where code = trim(p_code)) then raise exception 'الكود ده متسجل لعميل تاني'; end if;
+    update public.customers set status = 'approved', code = trim(p_code), reviewed_by = auth.uid(), reviewed_at = now() where id = p_id;
+    if c.opening_amount > 0 then
+      insert into public.transactions (customer_id, rep_id, kind, amount, note, occurred_at)
+      values (c.id, c.rep_id, 'opening', c.opening_amount, 'رصيد افتتاحي', least(coalesce(c.opening_date, now()), now()));
+    end if;
+  else
+    update public.customers set status = 'rejected', reviewed_by = auth.uid(), reviewed_at = now() where id = p_id;
+  end if;
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -357,6 +490,12 @@ alter table public.customers    enable row level security;
 alter table public.transactions enable row level security;
 alter table public.audit_log    enable row level security;
 alter table public.agencies     enable row level security;
+alter table public.day_closings enable row level security;
+
+drop policy if exists closings_select on public.day_closings;
+create policy closings_select on public.day_closings for select using (rep_id = auth.uid() or public.can_manage_rep(rep_id));
+drop policy if exists closings_insert on public.day_closings;
+create policy closings_insert on public.day_closings for insert with check (rep_id = auth.uid());
 
 -- Agency names are public (the sign-up page lists them; the app hides other agencies from managers).
 -- Only owners add or rename agencies.
@@ -399,6 +538,7 @@ do $$ begin
   begin alter publication supabase_realtime add table public.customers;    exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.profiles;     exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.agencies;     exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.day_closings; exception when duplicate_object then null; end;
 end $$;
 
 -- ---------------------------------------------------------------------

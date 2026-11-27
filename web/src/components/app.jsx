@@ -38,7 +38,8 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
   const repType = (id) => data.profiles.find((p) => p.id === id)?.rep_type;
   const [type, setType] = useState('all');
   const rows = useMemo(() => {
-    let r = list.filter((c) => !q.trim() || c.name.includes(q.trim()) || (c.phone || '').includes(q.trim()) || (c.location || '').includes(q.trim()));
+    const k = q.trim();
+    let r = list.filter((c) => !k || c.name.includes(k) || (c.owner_name || '').includes(k) || (c.code || '') === k || (c.phone || '').includes(k) || (c.location || '').includes(k));
     if (showRep && type !== 'all') r = r.filter((c) => repType(c.rep_id) === type);
     return r.sort((a, b) => (stats.get(b.id).overdue - stats.get(a.id).overdue) || (stats.get(b.id).balance - stats.get(a.id).balance));
   }, [list, q, type, stats]);
@@ -46,7 +47,7 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
     <div className="flex flex-wrap items-center gap-3 px-5">
       <div className="relative min-w-0 flex-[1_1_220px]">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالاسم أو التليفون أو المنطقة" className="ps-9" type="search" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالمحل أو صاحبه أو الكود أو التليفون" className="ps-9" type="search" />
       </div>
       {showRep && <Segmented value={type} onChange={setType} options={[['all', 'كل المناديب'], ['retail', 'مناديب القطاعي'], ['wholesale', 'مناديب الجملة']]} />}
     </div>
@@ -57,11 +58,11 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
           <THead><TR className="bg-muted/40 hover:bg-muted/40"><TH>العميل</TH>{showRep && <TH>المندوب</TH>}<TH className="text-end">الرصيد المستحق</TH><TH className="text-end">تحصيل الشهر</TH><TH>حالة الأجل</TH><TH className="w-0" /></TR></THead>
           <TBody>{rows.map((c) => { const s = stats.get(c.id); return (
             <TR key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className={cn('cursor-pointer', s.overdue ? 'bg-danger-soft/60 hover:bg-danger-soft' : 'hover:bg-muted/50')}>
-              <TD><div className="flex items-center gap-3"><Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'default'} /><div className="min-w-0"><div className={cn('font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="text-xs text-muted-foreground">{c.location}{c.phone && <> · <span dir="ltr">{c.phone}</span></>}</div></div></div></TD>
+              <TD><div className="flex items-center gap-3"><Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'default'} /><div className="min-w-0"><div className={cn('font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="text-xs text-muted-foreground">{[c.code && 'كود ' + c.code, c.owner_name, c.location].filter(Boolean).join(' · ')}{c.phone && <> · <span dir="ltr">{c.phone}</span></>}</div></div></div></TD>
               {showRep && <TD className="text-muted-foreground"><div>{nameOf(c.rep_id)}</div><div className="text-xs">{[TYPE[repType(c.rep_id)], agencyName(data.profiles.find((p) => p.id === c.rep_id)?.agency_id)].filter(Boolean).join(' · ')}</div></TD>}
               <TD className={cn('text-end font-semibold tnum', s.overdue && 'text-danger')}>{money(s.balance)}</TD>
               <TD className="text-end tnum text-muted-foreground">{s.monthCollected ? money(s.monthCollected) : '—'}</TD>
-              <TD><div className="flex flex-wrap gap-1.5"><DueBadge s={s} />{s.pending > 0 && <Badge variant="warning">تصحيح معلق</Badge>}</div></TD>
+              <TD><div className="flex flex-wrap gap-1.5">{c.status === 'pending' ? <Badge variant="brand" dot>بانتظار التكويد</Badge> : <DueBadge s={s} />}{s.pending > 0 && <Badge variant="warning">طلب معلق</Badge>}</div></TD>
               <TD className="text-end">{onCollect ? <Button size="sm" variant="outline" disabled={s.balance <= 0} onClick={(e) => { e.stopPropagation(); onCollect(c.id); }}><Wallet />تحصيل</Button> : <ChevronLeft className="size-4 text-muted-foreground" />}</TD>
             </TR>); })}</TBody>
         </Table>
@@ -71,11 +72,11 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
         <li key={c.id} onClick={() => go({ name: 'customer', id: c.id })} className={cn('cursor-pointer rounded-lg border p-3.5', s.overdue ? 'border-danger/30 bg-danger-soft/60' : 'bg-card')}>
           <div className="flex items-start gap-3">
             <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'default'} />
-            <div className="min-w-0 flex-1"><div className={cn('truncate font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="truncate text-xs text-muted-foreground">{showRep ? nameOf(c.rep_id) + ' · ' : ''}{c.location}</div></div>
+            <div className="min-w-0 flex-1"><div className={cn('truncate font-medium', s.overdue && 'text-danger')}>{c.name}</div><div className="truncate text-xs text-muted-foreground">{[showRep && nameOf(c.rep_id), c.code && 'كود ' + c.code, c.owner_name, c.location].filter(Boolean).join(' · ')}</div></div>
             <div className={cn('tnum text-base font-semibold', s.overdue && 'text-danger')}>{money(s.balance)}</div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5"><DueBadge s={s} />{s.monthCollected > 0 && <span className="text-xs text-muted-foreground">حصّل {money(s.monthCollected)}</span>}</div>
+            <div className="flex flex-wrap items-center gap-1.5">{c.status === 'pending' ? <Badge variant="brand" dot>بانتظار التكويد</Badge> : <DueBadge s={s} />}{s.monthCollected > 0 && <span className="text-xs text-muted-foreground">حصّل {money(s.monthCollected)}</span>}</div>
             {onCollect && <Button size="sm" variant="success" disabled={s.balance <= 0} onClick={(e) => { e.stopPropagation(); onCollect(c.id); }}><Wallet />تحصيل</Button>}
           </div>
         </li>); })}</ul>

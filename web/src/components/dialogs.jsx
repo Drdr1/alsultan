@@ -16,6 +16,8 @@ export function DialogsProvider({ children }) {
     {d?.type === 'invoice' && <InvoiceDialog id={d.id} onClose={close} />}
     {d?.type === 'customer' && <AddCustomerDialog onClose={close} />}
     {d?.type === 'correction' && <CorrectionDialog id={d.id} onClose={close} />}
+    {d?.type === 'return' && <ReturnDialog id={d.id} onClose={close} />}
+    {d?.type === 'close-day' && <CloseDayDialog onClose={close} />}
   </Ctx.Provider>;
 }
 
@@ -32,14 +34,14 @@ function CustomerPicker({ value, onChange, list, stats }) {
   return <Field label="العميل">
     <Select value={value} onChange={(e) => onChange(e.target.value)} required>
       <option value="">اختار العميل…</option>
-      {list.map((c) => <option key={c.id} value={c.id}>{c.name} · عليه {money(stats.get(c.id).balance)}</option>)}
+      {list.map((c) => <option key={c.id} value={c.id}>{c.code ? c.code + ' · ' : ''}{c.name} · عليه {money(stats.get(c.id).balance)}</option>)}
     </Select>
   </Field>;
 }
 
 function CollectDialog({ id, onClose }) {
   const { api, data, stats, toast, me } = useApp();
-  const mine = data.customers.filter((c) => (me.role === 'admin' || c.rep_id === me.id) && stats.get(c.id).balance > 0).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  const mine = data.customers.filter((c) => c.status !== 'pending' && (me.role === 'admin' || c.rep_id === me.id) && stats.get(c.id).balance > 0).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   const [cid, setCid] = useState(id || '');
   const [amt, setAmt] = useState('');
   const c = data.customers.find((x) => x.id === cid), s = c && stats.get(cid);
@@ -68,7 +70,7 @@ function CollectDialog({ id, onClose }) {
 function InvoiceDialog({ id, onClose }) {
   const { api, data, stats, toast, me, summaryOf } = useApp();
   const sum = summaryOf(me);
-  const mine = data.customers.filter((c) => c.rep_id === me.id).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  const mine = data.customers.filter((c) => c.rep_id === me.id && c.status !== 'pending').sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   const [cid, setCid] = useState(id || '');
   const c = data.customers.find((x) => x.id === cid);
   const { busy, error, submit } = useSubmit(async (fd) => {
@@ -76,7 +78,8 @@ function InvoiceDialog({ id, onClose }) {
     const amount = parseAmount(fd.get('amount'));
     if (!(amount > 0)) throw new Error('اكتب المبلغ بالأرقام');
     if (sum.total + amount > sum.limit) throw new Error(`مرفوض: المديونية هتبقى ${money(sum.total + amount)} وحد الائتمان ${money(sum.limit)}`);
-    await api.addTransaction({ customer_id: c.id, rep_id: c.rep_id, kind: 'invoice', amount, note: fd.get('note') });
+    const no = String(fd.get('invoice_no') || '').trim(); if (!no) throw new Error('اكتب رقم الفاتورة');
+    await api.addTransaction({ customer_id: c.id, rep_id: c.rep_id, kind: 'invoice', amount, invoice_no: no, note: fd.get('note') });
     toast(`تم تسجيل فاتورة ${money(amount)} ج.م على ${c.name}`);
   }, onClose);
   return <Dialog open onClose={onClose} title={c && id ? `فاتورة آجل · ${c.name}` : 'فاتورة آجل جديدة'} description="الفاتورة تزود رصيد العميل ومديونيتك، ومرفوضة لو هتعدي حد الائتمان.">
@@ -84,8 +87,11 @@ function InvoiceDialog({ id, onClose }) {
       {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
       <Context label="المتاح قبل الحد" value={Math.max(0, sum.limit - sum.total)} tone="text-success" />
       <Field label="قيمة الفاتورة"><AmountInput /></Field>
-      <Field label="رقم الفاتورة / ملاحظة"><Input name="note" placeholder="مثلاً: فاتورة 1543" /></Field>
-      <div className="flex items-center gap-2 rounded-md bg-brand-soft px-3 py-2.5 text-[0.875rem] text-brand"><CalendarClock className="size-4" />آخر يوم للأجل: {fmtDate(Date.now() + (TERM_DAYS - 1) * DAY)}</div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="رقم الفاتورة"><Input name="invoice_no" inputMode="numeric" dir="ltr" placeholder="1543" required /></Field>
+        <Field label="ملاحظة (اختياري)"><Input name="note" /></Field>
+      </div>
+      <div className="flex items-center gap-2 rounded-md bg-brand-soft px-3 py-2.5 text-[0.875rem] text-brand"><CalendarClock className="size-4" />تاريخ الاستحقاق: {fmtDate(Date.now() + (TERM_DAYS - 1) * DAY)} (بعد {TERM_DAYS} يوم)</div>
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>تسجيل الفاتورة</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
@@ -93,21 +99,26 @@ function InvoiceDialog({ id, onClose }) {
 }
 
 function AddCustomerDialog({ onClose }) {
-  const { api, data, toast } = useApp();
+  const { api, data, toast, me, can } = useApp();
+  const direct = me.role === 'admin' && can('coding');
   const today = new Date().toISOString().slice(0, 10), minD = new Date(Date.now() - 365 * DAY).toISOString().slice(0, 10);
   const [name, setName] = useState(''); const [phone, setPhone] = useState('');
   const dup = data.customers.find((c) => (name.trim() && c.name === name.trim()) || (phone.trim().length > 6 && c.phone === phone.trim()));
   const { busy, error, submit } = useSubmit(async (fd) => {
-    const n = String(fd.get('name') || '').trim(); if (!n) throw new Error('اكتب اسم العميل');
+    const n = String(fd.get('name') || '').trim(); if (!n) throw new Error('اكتب اسم المحل');
+    const owner = String(fd.get('owner_name') || '').trim(); if (!owner) throw new Error('اكتب اسم صاحب المحل');
     const opening = fd.get('opening') ? parseAmount(fd.get('opening')) : 0;
     if (!(opening >= 0)) throw new Error('الرصيد لازم يكون رقم');
     const d = fd.get('opening_date');
-    await api.addCustomer({ name: n, phone: fd.get('phone'), location: fd.get('location'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
-    toast(`تمت إضافة ${n}`);
+    await api.addCustomer({ name: n, owner_name: owner, phone: fd.get('phone'), location: fd.get('location'), opening, opening_date: d ? new Date(d + 'T12:00:00').toISOString() : null });
+    toast(direct ? `تمت إضافة ${n}` : `اتبعت طلب تكويد ${n}، وهيتفعّل بعد موافقة الإدارة`);
   }, onClose);
-  return <Dialog open onClose={onClose} title="إضافة عميل جديد" description="سجّل بيانات المحل والمبلغ اللي عليه دلوقتي." width="max-w-lg">
+  return <Dialog open onClose={onClose} title={direct ? 'إضافة عميل جديد' : 'طلب تكويد عميل جديد'} description={direct ? 'سجّل بيانات المحل والمبلغ اللي عليه دلوقتي.' : 'الطلب بيروح للإدارة تديله كود. بعد التكويد تقدر تسجّل عليه فواتير وتحصيل.'} width="max-w-lg">
     <form onSubmit={submit} className="grid gap-4" noValidate>
-      <Field label="اسم العميل / المحل"><Input name="name" value={name} onChange={(e) => setName(e.target.value)} required /></Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="اسم المحل"><Input name="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="مثلاً: ماركت النور" required /></Field>
+        <Field label="اسم صاحب المحل"><Input name="owner_name" placeholder="مثلاً: الحاج سعيد" required /></Field>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="رقم التليفون"><Input name="phone" inputMode="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
         <Field label="العنوان"><Input name="location" placeholder="المنطقة - الشارع" /></Field>
@@ -118,7 +129,7 @@ function AddCustomerDialog({ onClose }) {
       </div>
       {dup && <p className="rounded-md bg-warning-soft px-3 py-2 text-[0.875rem] text-warning">تنبيه: فيه عميل مسجل باسم "{dup.name}"{dup.phone ? ` (${dup.phone})` : ''}</p>}
       <FormError>{error}</FormError>
-      <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>حفظ العميل</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
+      <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>{direct ? 'حفظ العميل' : 'إرسال طلب التكويد'}</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
   </Dialog>;
 }
@@ -144,6 +155,67 @@ function CorrectionDialog({ id, onClose }) {
       <Field label="السبب"><Textarea name="note" rows={2} placeholder="مثلاً: تحصيل 2000 يوم 12 اتسجل 20000 بالغلط" required /></Field>
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>{admin ? 'تطبيق التصحيح' : 'إرسال للإدارة'}</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
+    </form>
+  </Dialog>;
+}
+
+function ReturnDialog({ id, onClose }) {
+  const { api, data, stats, toast, me, can } = useApp();
+  const direct = me.role === 'admin';
+  const mine = data.customers.filter((c) => c.status !== 'pending' && (direct || c.rep_id === me.id) && stats.get(c.id).balance > 0).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  const [cid, setCid] = useState(id || '');
+  const c = data.customers.find((x) => x.id === cid), s = c && stats.get(cid);
+  const { busy, error, submit } = useSubmit(async (fd) => {
+    if (!c) throw new Error('اختار العميل');
+    const amount = parseAmount(fd.get('amount')), note = String(fd.get('note') || '').trim();
+    if (!(amount > 0)) throw new Error('اكتب قيمة المرتجع بالأرقام');
+    if (amount > s.balance) throw new Error(`المرتجع أكبر من رصيد العميل (${money(s.balance)})`);
+    if (note.length < 3) throw new Error('اكتب الأصناف أو سبب المرتجع');
+    await api.addTransaction({ customer_id: c.id, rep_id: c.rep_id, kind: 'return', amount, note });
+    toast(direct ? `تم تسجيل مرتجع ${money(amount)} ج.م` : 'اتبعت المرتجع للإدارة، وهيتخصم بعد الموافقة');
+  }, onClose);
+  if (direct && !can('review')) return <Dialog open onClose={onClose} title="مرتجع"><p className="text-sm text-muted-foreground">تسجيل المرتجعات محتاج صلاحية "التصحيح والمرتجعات".</p></Dialog>;
+  return <Dialog open onClose={onClose} title={c && id ? `مرتجع · ${c.name}` : 'تسجيل مرتجع'} description={direct ? 'المرتجع بيقلل مديونية العميل والمندوب، ومش بيتحسب تحصيل.' : 'المرتجع بيروح للإدارة، وبعد الموافقة بيقلل مديونية العميل ومديونيتك. مش بيتحسب تحصيل.'}>
+    <form onSubmit={submit} className="grid gap-4" noValidate>
+      {!id && <CustomerPicker value={cid} onChange={setCid} list={mine} stats={stats} />}
+      {s && <Context label="الرصيد الحالي" value={s.balance} />}
+      <Field label="قيمة المرتجع"><AmountInput /></Field>
+      <Field label="الأصناف / السبب"><Textarea name="note" rows={2} placeholder="مثلاً: 5 كراتين منتهية الصلاحية" required /></Field>
+      <FormError>{error}</FormError>
+      <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>{direct ? 'تسجيل المرتجع' : 'إرسال للإدارة'}</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
+    </form>
+  </Dialog>;
+}
+
+// Daily closing: the rep confirms the day's totals and the cash he handed in. After that, nothing more today.
+export function useToday() {
+  const { data, me } = useApp();
+  const day = new Date().toDateString();
+  const mine = data.transactions.filter((t) => t.rep_id === me.id && t.status !== 'rejected' && new Date(t.created_at).toDateString() === day);
+  const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
+  return { collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), count: mine.length };
+}
+
+function CloseDayDialog({ onClose }) {
+  const { api, toast } = useApp();
+  const t = useToday();
+  const { busy, error, submit } = useSubmit(async (fd) => {
+    const remitted = parseAmount(fd.get('remitted') || '0');
+    if (!(remitted >= 0)) throw new Error('اكتب المبلغ اللي ورّدته بالأرقام');
+    await api.closeDay({ remitted, note: fd.get('note') });
+    toast('تم تقفيل اليوم');
+  }, onClose);
+  return <Dialog open onClose={onClose} title="تقفيل اليوم" description="بعد التقفيل مش هتقدر تسجّل أي فاتورة أو تحصيل تاني النهارده، ولا ترجع تعدّل التقفيل.">
+    <form onSubmit={submit} className="grid gap-4" noValidate>
+      <div className="grid gap-2">
+        <Context label="تحصيل النهارده" value={t.collections} tone="text-success" />
+        <Context label="فواتير النهارده" value={t.invoices} />
+        <Context label="مرتجعات النهارده" value={t.returns} />
+      </div>
+      <Field label="المبلغ اللي ورّدته للشركة"><AmountInput name="remitted" defaultValue={money(t.collections)} /></Field>
+      <Field label="ملاحظة (اختياري)"><Input name="note" placeholder="مثلاً: شيك بـ 5,000 هيتورّد بكرة" /></Field>
+      <FormError>{error}</FormError>
+      <div className="flex gap-2"><Button type="submit" variant="danger" className="flex-1" size="lg" disabled={busy}>تقفيل اليوم نهائياً</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
     </form>
   </Dialog>;
 }

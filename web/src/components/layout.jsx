@@ -66,7 +66,7 @@ function useNav() {
     ['reps', Users, 'المناديب', 0],
     ['customers', Store, 'العملاء', 0],
     ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger'],
-    ['approvals', ClipboardCheck, 'طلبات التصحيح', data.transactions.filter((t) => t.status === 'pending').length, 'warning'],
+    ['approvals', ClipboardCheck, 'الطلبات', data.transactions.filter((t) => t.status === 'pending').length + data.customers.filter((c) => c.status === 'pending').length, 'warning'],
     ['report', FileText, 'تقرير المديونية', 0],
     ['accounts', UserPlus, 'حسابات جديدة', raw.profiles.filter((r) => r.role === 'rep' && !r.active).length, 'brand'],
     ...(owner ? [['settings', Settings, 'الإعدادات والصلاحيات', 0]] : []),
@@ -74,8 +74,8 @@ function useNav() {
   return [['home', Home, 'الرئيسية', 0], ['overdue', AlertTriangle, 'المتأخرين', overdue.length, 'danger']];
 }
 
-const SHORT = { home: 'الرئيسية', approvals: 'التصحيح', accounts: 'الحسابات' };
-const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'طلبات التصحيح', accounts: 'حسابات جديدة', report: 'تقرير المديونية', settings: 'الإعدادات والصلاحيات' };
+const SHORT = { home: 'الرئيسية', approvals: 'الطلبات', accounts: 'الحسابات' };
+const TITLES = { home: 'لوحة التحكم', reps: 'المناديب', customers: 'العملاء', overdue: 'العملاء المتأخرين', approvals: 'الطلبات (تصحيح، مرتجع، تكويد)', accounts: 'حسابات جديدة', report: 'تقرير المديونية', settings: 'الإعدادات والصلاحيات' };
 
 function BellMenu() {
   const { overdue, go, me, nameOf, stats, overLimit, idleReps, agency } = useApp();

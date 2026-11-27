@@ -23,14 +23,20 @@ export const parseAmount = (s) => {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
 };
 export const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
-export const KIND = { opening: 'رصيد افتتاحي', invoice: 'فاتورة آجل', collection: 'تحصيل', correction: 'تصحيح' };
+export const KIND = { opening: 'رصيد افتتاحي', invoice: 'فاتورة آجل', collection: 'تحصيل', return: 'مرتجع', correction: 'تصحيح' };
+// Admin permissions an owner can give a manager (owners have all of them).
+export const PERMS = { credit: 'تعديل حد الائتمان', review: 'التصحيح والمرتجعات', coding: 'تكويد العملاء' };
+export const dayKey = (d = Date.now()) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+export const dueOf = (t) => new Date(t.occurred_at).getTime() + (TERM_DAYS - 1) * DAY; // last day of the term for an invoice
 export const TYPE = { retail: 'قطاعي', wholesale: 'جملة' };
 export const REP_TYPE = { retail: 'مندوب قطاعي', wholesale: 'مندوب جملة' };
 
 /* ---------------- domain logic ---------------- */
+// Signed amount: collections and returns lower the debt.
+export const signed = (t) => (t.kind === 'collection' || t.kind === 'return' ? -Number(t.amount) : Number(t.amount));
 export function effect(t) {
   if (t.status !== 'approved') return 0;
-  return t.kind === 'collection' ? -Number(t.amount) : Number(t.amount);
+  return signed(t);
 }
 
 // FIFO: collections pay the oldest debt first. The oldest unpaid part decides overdue.
@@ -42,7 +48,7 @@ export function analyzeCustomer(c, txs, now = Date.now()) {
   for (const t of list) {
     const e = effect(t);
     balance += e;
-    if (e > 0) debits.push({ at: new Date(t.occurred_at).getTime(), left: e });
+    if (e > 0) debits.push({ at: new Date(t.occurred_at).getTime(), left: e, t });
     else if (e < 0) credit += -e;
     if (t.kind === 'collection' && t.status === 'approved') {
       if (monthKey(t.occurred_at) === mk) monthCollected += Number(t.amount);
@@ -61,6 +67,8 @@ export function analyzeCustomer(c, txs, now = Date.now()) {
     overdueDays: overdue ? age - TERM_DAYS : 0,
     dueDate: oldest == null ? null : oldest + (TERM_DAYS - 1) * DAY, // last day of the term
     pending: list.filter((t) => t.status === 'pending').length,
+    // invoices (and opening balance) still unpaid, oldest first, with what is left and the due day
+    openItems: open.map((d) => ({ t: d.t, left: Math.round(d.left * 100) / 100, due: d.at + (TERM_DAYS - 1) * DAY })),
   };
 }
 
@@ -78,6 +86,7 @@ export function repSummary(rep, customers, stats) {
 
 /* ---------------- roles ---------------- */
 export const isOwner = (p) => !!p && p.role === 'admin' && p.active !== false && !!p.is_owner;
+export const hasPerm = (p, k) => isOwner(p) || (!!p && p.role === 'admin' && p.active !== false && (p.perms || []).includes(k));
 export const inScopes = (admin, rep) => (admin?.scopes || []).some((x) => x.agency_id === rep.agency_id && x.rep_type === rep.rep_type);
 
 /* ---------------- demo backend (local, realtime across tabs) ---------------- */
@@ -90,6 +99,9 @@ export function demoSeed() {
     { id: 'u-barqi', username: 'barqi', full_name: 'محمد البرقي', role: 'admin', title: 'مدير فرع تايجر', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-younis', username: 'younis', full_name: 'محمد يونس', role: 'admin', title: 'مشرف تجزئة', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-aref', username: 'aref', full_name: 'أحمد عارف', role: 'admin', title: 'مشرف جملة', scopes: [{ agency_id: 'ag-tiger', rep_type: 'wholesale' }], credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-mokhtar', username: 'mokhtar', full_name: 'محمد مختار', role: 'admin', title: 'محاسب الفرع', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], perms: ['credit', 'review', 'coding'], credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-ezzat', username: 'ezzat', full_name: 'محمد عزت', role: 'admin', title: 'محاسب', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], perms: ['credit', 'review', 'coding'], credit_limit: 0, active: true, created_at: at(110) },
+    { id: 'u-gomaa', username: 'gomaa', full_name: 'محمود جمعة', role: 'admin', title: 'محاسب', scopes: [{ agency_id: 'ag-tiger', rep_type: 'retail' }, { agency_id: 'ag-tiger', rep_type: 'wholesale' }], perms: ['credit', 'review', 'coding'], credit_limit: 0, active: true, created_at: at(110) },
     { id: 'u-ahmed', username: 'ahmed', full_name: 'أحمد عبد العزيز', role: 'rep', credit_limit: 1000000, rep_type: 'wholesale', agency_id: 'ag-tiger', active: true, created_at: at(100) },
     { id: 'u-mahmoud', username: 'mahmoud', full_name: 'محمود السيد', role: 'rep', credit_limit: 500000, rep_type: 'retail', agency_id: 'ag-molfix', active: true, created_at: at(100) },
     { id: 'u-karim', username: 'karim', full_name: 'كريم فتحي', role: 'rep', credit_limit: 200000, rep_type: 'retail', agency_id: 'ag-tiger', active: true, created_at: at(100) },
@@ -117,13 +129,14 @@ export function demoSeed() {
     ['u-karim', 'بقالة الحرمين', '01555667788', 'الجناين - جنيفة', 'retail', 4500, 1],
     ['u-karim', 'ماركت السلطان الصغير', '01066778899', 'الجناين - عامر', 'retail', 6000, 1],
   ];
-  const customers = [], transactions = [];
+  const owners = ['الحاج محمد سعيد', 'سعيد عبد الله', 'محمود النجار', 'د. هاني فؤاد', 'إبراهيم الشاذلي', 'أم هاشم', 'فتحي عبد الرحمن', 'رضا السيد', 'عادل حسن', 'وليد مصطفى', 'جمال عبده', 'د. منى رشاد', 'أحمد الشيخ', 'صفاء محمود', 'حسن البركة', 'عبد الهادي علي', 'محمد الحرمين', 'سلطان فرج'];
+  const customers = [], transactions = [], closings = [];
   let seedR = 7;
   const rnd = () => { seedR = (seedR * 16807) % 2147483647; return seedR / 2147483647; };
   const round = (n) => Math.round(n / 50) * 50;
   shops.forEach(([rep, name, phone, location, type, weekly, ratio], i) => {
     const id = 'c-' + (i + 1);
-    customers.push({ id, rep_id: rep, name, phone, location, debt_type: rep === 'u-ahmed' ? 'wholesale' : 'retail', agency_id: rep === 'u-mahmoud' ? 'ag-molfix' : 'ag-tiger', created_at: at(84, 9), created_by: rep });
+    customers.push({ id, rep_id: rep, name, owner_name: owners[i], code: String(1001 + i), status: 'approved', phone, location, debt_type: rep === 'u-ahmed' ? 'wholesale' : 'retail', agency_id: rep === 'u-mahmoud' ? 'ag-molfix' : 'ag-tiger', created_at: at(84, 9), created_by: rep });
     const debts = [];
     const opening = round(weekly * (1.4 + rnd()));
     debts.push(opening);
@@ -135,22 +148,37 @@ export function demoSeed() {
       {
         const inv = round(weekly * (0.75 + rnd() * 0.5));
         debts.push(inv);
-        transactions.push({ id: uid(), customer_id: id, rep_id: rep, kind: 'invoice', amount: inv, note: 'فاتورة رقم ' + (1000 + i * 20 + w), status: 'approved', occurred_at: at(d, d ? 12 + (i % 5) : 8), created_at: at(d, d ? 12 + (i % 5) : 8), created_by: rep });
+        transactions.push({ id: uid(), customer_id: id, rep_id: rep, kind: 'invoice', amount: inv, invoice_no: String(5000 + i * 20 + w), note: '', status: 'approved', occurred_at: at(d, d ? 12 + (i % 5) : 8), created_at: at(d, d ? 12 + (i % 5) : 8), created_by: rep });
       }
     }
   });
   // one pending correction request for the demo
   const c3 = customers[2];
   transactions.push({ id: uid(), customer_id: c3.id, rep_id: c3.rep_id, kind: 'correction', amount: -2000, note: 'العميل دفع 2000 امبارح ونسيت أسجلها - أكد معاه بالتليفون', status: 'pending', occurred_at: at(0, 9), created_at: at(0, 9), created_by: c3.rep_id });
+  // a pending return (needs approval) and a new-customer coding request
+  const c1 = customers[0];
+  transactions.push({ id: uid(), customer_id: c1.id, rep_id: c1.rep_id, kind: 'return', amount: 3500, note: 'مرتجع 5 كراتين منتهية الصلاحية', status: 'pending', occurred_at: at(0, 10), created_at: at(0, 10), created_by: c1.rep_id });
+  customers.push({ id: 'c-new', rep_id: 'u-karim', name: 'ماركت الأمل', owner_name: 'عم شعبان', code: null, status: 'pending', phone: '01099887766', location: 'الجناين - الشلوفة', debt_type: 'retail', agency_id: 'ag-tiger', opening_amount: 4200, opening_date: at(3, 12), created_at: at(0, 9), created_by: 'u-karim' });
+  // daily closings (with the cash handed in) for the past collection days
+  for (const rep of ['u-ahmed', 'u-mahmoud', 'u-karim']) {
+    for (let d = 7; d <= 28; d += 7) {
+      const day = dayKey(now - d * DAY);
+      const mine = transactions.filter((t) => t.rep_id === rep && t.status === 'approved' && dayKey(t.occurred_at) === day);
+      const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
+      const col = sum('collection');
+      closings.push({ id: uid(), rep_id: rep, day, collections: col, invoices: sum('invoice'), returns: sum('return'), remitted: rep === 'u-karim' && d === 7 ? col - 1500 : col, note: rep === 'u-karim' && d === 7 ? 'باقي 1500 مع المندوب' : '', created_at: at(d, 19) });
+    }
+  }
   const agencies = [{ id: 'ag-tiger', name: 'تايجر', created_at: at(120) }, { id: 'ag-molfix', name: 'مولفيكس', created_at: at(120) }];
-  return { v: 1, agencies, profiles, passwords, customers, transactions };
+  return { v: 1, agencies, profiles, passwords, customers, transactions, closings };
 }
 
 export function DemoBackend() {
-  const KEY = 'alsultan-demo-v7';
+  const KEY = 'alsultan-demo-v8';
   const SKEY = 'alsultan-demo-session';
   let memSession = null;
   let db = safe(() => JSON.parse(localStorage.getItem(KEY)), null) || demoSeed();
+  db.closings ||= [];
   const persist = () => safe(() => localStorage.setItem(KEY, JSON.stringify(db)));
   persist();
   const ch = 'BroadcastChannel' in window ? new BroadcastChannel(KEY) : null;
@@ -174,6 +202,7 @@ export function DemoBackend() {
     const r = db.profiles.find((p) => p.id === repId);
     return !!r && r.role === 'rep' && inScopes(m, r);
   };
+  const nextCode = () => String(Math.max(1000, ...db.customers.map((c) => Number(c.code) || 0)) + 1);
   const balOf = (pred) => db.transactions.filter((t) => t.status === 'approved' && pred(t)).reduce((s, t) => s + effect(t), 0);
 
   function insertTx(input) {
@@ -181,6 +210,10 @@ export function DemoBackend() {
     const cust = db.customers.find((c) => c.id === input.customer_id);
     if (!cust) throw new Error('العميل غير موجود');
     if (!repVisible(m, cust.rep_id)) throw new Error('العميل ده مش بتاعك');
+    if ((cust.status || 'approved') !== 'approved' && !input.fromCoding) throw new Error('العميل ده لسه مستني التكويد');
+    const isAdmin = m.role === 'admin';
+    if (!isAdmin && db.closings.some((x) => x.rep_id === m.id && x.day === dayKey())) throw new Error('اليوم اتقفل، تقدر تسجّل من بكرة');
+    if (isAdmin && (input.kind === 'correction' || input.kind === 'return') && !hasPerm(m, 'review')) throw new Error('التصحيح والمرتجعات محتاجين صلاحية');
     const amount = Number(input.amount);
     if (!amount || (input.kind !== 'correction' && amount <= 0)) throw new Error('اكتب مبلغ صحيح');
     const nowIso = new Date().toISOString();
@@ -190,7 +223,7 @@ export function DemoBackend() {
       occurred = new Date(t).toISOString();
     }
     if (input.kind === 'opening' && db.transactions.some((t) => t.customer_id === cust.id && t.kind === 'opening')) throw new Error('الرصيد الافتتاحي متسجل قبل كده');
-    if (input.kind === 'collection') {
+    if (input.kind === 'collection' || input.kind === 'return') {
       const bal = balOf((t) => t.customer_id === cust.id);
       if (amount > bal + 0.001) throw new Error(`المبلغ (${money(amount)}) أكبر من مديونية العميل (${money(bal)})`);
     }
@@ -199,14 +232,14 @@ export function DemoBackend() {
       const bal = balOf((t) => t.rep_id === cust.rep_id);
       if (bal + amount > Number(rep.credit_limit)) throw new Error(`مرفوض: المديونية هتبقى ${money(bal + amount)} وحد الائتمان ${money(rep.credit_limit)}`);
     }
-    const isAdmin = m.role === 'admin';
+    const needsReview = input.kind === 'correction' || input.kind === 'return';
     const tx = {
       id: uid(), customer_id: cust.id, rep_id: cust.rep_id, kind: input.kind, amount,
-      note: (input.note || '').trim(), corrects_id: input.corrects_id || null,
-      status: input.kind === 'correction' && !isAdmin ? 'pending' : 'approved',
+      note: (input.note || '').trim(), corrects_id: input.corrects_id || null, invoice_no: input.kind === 'invoice' ? String(input.invoice_no || '').trim() || null : null,
+      status: needsReview && !isAdmin ? 'pending' : 'approved',
       occurred_at: occurred, created_at: nowIso, created_by: m.id,
-      reviewed_by: input.kind === 'correction' && isAdmin ? m.id : null,
-      reviewed_at: input.kind === 'correction' && isAdmin ? nowIso : null,
+      reviewed_by: needsReview && isAdmin ? m.id : null,
+      reviewed_at: needsReview && isAdmin ? nowIso : null,
     };
     db.transactions.push(tx);
     return tx;
@@ -231,36 +264,68 @@ export function DemoBackend() {
     },
     async signOut() { setSession(null); },
     async loadAll() {
-      const m = me(); if (!m) return { agencies: [], profiles: [], customers: [], transactions: [] };
+      const m = me(); if (!m) return { agencies: [], profiles: [], customers: [], transactions: [], closings: [] };
       if (m.role === 'admin') {
-        if (isOwner(m)) return structuredClone({ agencies: db.agencies, profiles: db.profiles, customers: db.customers, transactions: db.transactions });
+        if (isOwner(m)) return structuredClone({ agencies: db.agencies, profiles: db.profiles, customers: db.customers, transactions: db.transactions, closings: db.closings });
         const reps = new Set(db.profiles.filter((p) => repVisible(m, p.id)).map((p) => p.id));
         return structuredClone({
           agencies: db.agencies.filter((a) => (m.scopes || []).some((x) => x.agency_id === a.id)),
           profiles: db.profiles.filter((p) => reps.has(p.id) || p.id === m.id || isOwner(p)),
           customers: db.customers.filter((c) => reps.has(c.rep_id)),
           transactions: db.transactions.filter((t) => reps.has(t.rep_id)),
+          closings: db.closings.filter((x) => reps.has(x.rep_id)),
         });
       }
-      return structuredClone({ agencies: db.agencies.filter((a) => a.id === m.agency_id), profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id) });
+      return structuredClone({ agencies: db.agencies.filter((a) => a.id === m.agency_id), profiles: [m], customers: db.customers.filter((c) => c.rep_id === m.id), transactions: db.transactions.filter((t) => t.rep_id === m.id), closings: db.closings.filter((x) => x.rep_id === m.id) });
     },
-    async addCustomer({ name, phone, location, opening, opening_date, rep_id }) {
+    async addCustomer({ name, owner_name, phone, location, opening, opening_date, rep_id }) {
       const m = requireActive();
       if (m.role === 'admin' && rep_id && !repVisible(m, rep_id)) throw new Error('المندوب ده مش في توكيلك');
       const owner = m.role === 'admin' && rep_id ? db.profiles.find((x) => x.id === rep_id) : m;
       const debt_type = owner?.rep_type || 'retail';
       const agency_id = owner?.agency_id || null;
-      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, agency_id, created_at: new Date().toISOString(), created_by: m.id };
+      // a rep's new customer is a coding request: it waits for someone with the coding permission
+      const coded = m.role === 'admin' && hasPerm(m, 'coding');
+      const c = { id: 'c-' + uid(), rep_id: m.role === 'admin' && rep_id ? rep_id : m.id, name: name.trim(), owner_name: (owner_name || '').trim(), phone: (phone || '').trim(), location: (location || '').trim(), debt_type, agency_id,
+        code: coded ? nextCode() : null, status: coded ? 'approved' : 'pending', opening_amount: opening > 0 ? opening : 0, opening_date: opening_date || null, created_at: new Date().toISOString(), created_by: m.id };
       db.customers.push(c);
-      if (opening > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: opening, note: 'رصيد افتتاحي', occurred_at: opening_date });
+      if (coded && opening > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: opening, note: 'رصيد افتتاحي', occurred_at: opening_date });
       commit({ table: 'customers', type: 'INSERT', row: c });
       return c.id;
+    },
+    async codeCustomer(id, approve, code) {
+      const m = requireActive(); if (!hasPerm(m, 'coding')) throw new Error('تكويد العملاء محتاج صلاحية');
+      const c = db.customers.find((x) => x.id === id);
+      if (!c || c.status !== 'pending' || !repVisible(m, c.rep_id)) throw new Error('الطلب ده اتراجع قبل كده');
+      if (approve) {
+        const k = String(code || '').trim(); if (!k) throw new Error('اكتب كود العميل');
+        if (db.customers.some((x) => x.code === k)) throw new Error('الكود ده متسجل لعميل تاني');
+        c.status = 'approved'; c.code = k;
+        if (Number(c.opening_amount) > 0) insertTx({ customer_id: c.id, kind: 'opening', amount: c.opening_amount, note: 'رصيد افتتاحي', occurred_at: c.opening_date, fromCoding: true });
+      } else c.status = 'rejected';
+      c.reviewed_by = m.id; c.reviewed_at = new Date().toISOString();
+      commit({ table: 'customers', type: 'UPDATE', row: c });
+    },
+    async closeDay({ remitted, note }) {
+      const m = requireActive(); if (m.role !== 'rep') throw new Error('التقفيل للمندوب بس');
+      const day = dayKey();
+      if (db.closings.some((x) => x.rep_id === m.id && x.day === day)) throw new Error('اليوم متقفل قبل كده');
+      const mine = db.transactions.filter((t) => t.rep_id === m.id && t.status !== 'rejected' && dayKey(t.created_at) === day);
+      const sum = (k) => mine.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
+      const r = Number(remitted); if (!(r >= 0)) throw new Error('اكتب المبلغ اللي اتورّد');
+      const x = { id: uid(), rep_id: m.id, day, collections: sum('collection'), invoices: sum('invoice'), returns: sum('return'), remitted: r, note: (note || '').trim(), created_at: new Date().toISOString() };
+      db.closings.push(x); commit({ table: 'day_closings', type: 'INSERT', row: x }); return x;
     },
     async addTransaction(input) { const tx = insertTx(input); commit({ table: 'transactions', type: 'INSERT', row: tx }); return tx; },
     async reviewTransaction(id, approve) {
       const m = requireActive(); if (m.role !== 'admin') throw new Error('للإدارة فقط');
       const t = db.transactions.find((x) => x.id === id);
       if (!t || t.status !== 'pending' || !repVisible(m, t.rep_id)) throw new Error('الطلب ده اتراجع قبل كده');
+      if (!hasPerm(m, 'review')) throw new Error('مراجعة التصحيح والمرتجعات محتاجة صلاحية');
+      if (approve && t.kind === 'return') {
+        const bal = balOf((x) => x.customer_id === t.customer_id);
+        if (t.amount > bal + 0.001) throw new Error(`المرتجع (${money(t.amount)}) أكبر من مديونية العميل (${money(bal)})`);
+      }
       t.status = approve ? 'approved' : 'rejected'; t.reviewed_by = m.id; t.reviewed_at = new Date().toISOString();
       commit({ table: 'transactions', type: 'UPDATE', row: t });
     },
@@ -271,9 +336,10 @@ export function DemoBackend() {
       if ('is_owner' in patch && !!patch.is_owner !== !!p.is_owner) throw new Error('مينفعش تغيير المدير العام من هنا');
       if (!isOwner(m)) {
         if (!repVisible(m, id)) throw new Error('الحساب ده مش في صلاحياتك');
-        if (('role' in patch && patch.role !== p.role) || 'scopes' in patch || 'title' in patch) throw new Error('الصلاحيات بيحددها المدير العام بس');
+        if (('role' in patch && patch.role !== p.role) || 'scopes' in patch || 'title' in patch || 'perms' in patch) throw new Error('الصلاحيات بيحددها المدير العام بس');
         if (!inScopes(m, { ...p, ...patch })) throw new Error('مينفعش تنقل مندوب لحاجة مش في صلاحياتك');
       } else if (isOwner(p) && p.id !== m.id) throw new Error('مينفعش تعدّل حساب مدير عام تاني');
+      if ('credit_limit' in patch && Number(patch.credit_limit) !== Number(p.credit_limit) && !hasPerm(m, 'credit')) throw new Error('تعديل حد الائتمان للمحاسب والمدير العام بس');
       Object.assign(p, patch);
       commit({ table: 'profiles', type: 'UPDATE', row: p });
     },
@@ -321,15 +387,17 @@ export async function SupabaseBackend() {
     },
     async signOut() { await sb.auth.signOut(); },
     async loadAll() {
-      const [agencies, profiles, customers, transactions] = await Promise.all([fetchAll('agencies', 'name'), fetchAll('profiles', 'created_at'), fetchAll('customers', 'created_at'), fetchAll('transactions', 'occurred_at')]);
-      return { agencies, profiles, customers, transactions };
+      const [agencies, profiles, customers, transactions, closings] = await Promise.all([fetchAll('agencies', 'name'), fetchAll('profiles', 'created_at'), fetchAll('customers', 'created_at'), fetchAll('transactions', 'occurred_at'), fetchAll('day_closings', 'day')]);
+      return { agencies, profiles, customers, transactions, closings };
     },
     async addCustomer(c) {
-      const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null });
+      const { data, error } = await sb.rpc('add_customer', { p_name: c.name, p_phone: c.phone, p_location: c.location, p_debt_type: null, p_opening: c.opening || 0, p_opening_date: c.opening_date || null, p_rep_id: c.rep_id || null, p_owner_name: c.owner_name || null });
       fail(error); return data;
     },
+    async codeCustomer(id, approve, code) { const { error } = await sb.rpc('code_customer', { p_id: id, p_approve: !!approve, p_code: code || null }); fail(error); },
+    async closeDay({ remitted, note }) { const { data, error } = await sb.from('day_closings').insert({ remitted, note: note || null }).select().single(); fail(error); return data; },
     async addTransaction(t) {
-      const row = { customer_id: t.customer_id, rep_id: t.rep_id, kind: t.kind, amount: t.amount, note: t.note || null, corrects_id: t.corrects_id || null };
+      const row = { customer_id: t.customer_id, rep_id: t.rep_id, kind: t.kind, amount: t.amount, note: t.note || null, corrects_id: t.corrects_id || null, invoice_no: t.invoice_no || null };
       const { data, error } = await sb.from('transactions').insert(row).select().single(); fail(error); return data;
     },
     async reviewTransaction(id, approve) { const { error } = await sb.from('transactions').update({ status: approve ? 'approved' : 'rejected' }).eq('id', id); fail(error); },

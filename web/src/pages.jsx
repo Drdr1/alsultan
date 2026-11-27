@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search } from './components/icons.jsx';
-import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, KIND, TYPE, REP_TYPE, TERM_DAYS, parseAmount } from './lib/core.js';
+import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, Search, ArrowRight } from './components/icons.jsx';
+import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
-import { useDialogs } from './components/dialogs.jsx';
+import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
 import { MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
 import { CustomerTable, CreditCard, TrendCard, RepBarsCard, RepCard, StatCard, DueBadge, initials } from './components/app.jsx';
@@ -18,18 +18,33 @@ const Greeting = ({ name, children }) => {
 
 /* ================= rep ================= */
 export function RepHome() {
-  const { me, data, summaryOf, nav, stats } = useApp();
+  const { me, data, summaryOf, nav, stats, closedToday } = useApp();
   const open = useDialogs();
   const sum = summaryOf(me);
+  const today = useToday();
   const overdue = sum.customers.filter((c) => stats.get(c.id).overdue).length;
+  const closed = !!closedToday;
   return <>
     <Greeting name={me.full_name}>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
         <Button variant="outline" onClick={() => open({ type: 'customer' })}><UserPlus />عميل جديد</Button>
-        <Button variant="outline" disabled={sum.over} onClick={() => open({ type: 'invoice' })} title={sum.over ? 'موقوف: تجاوز حد الائتمان' : ''}><FileText />فاتورة آجل</Button>
-        <Button variant="success" onClick={() => open({ type: 'collect' })}><Wallet />تسجيل تحصيل</Button>
+        <Button variant="outline" disabled={sum.over || closed} onClick={() => open({ type: 'invoice' })} title={sum.over ? 'موقوف: تجاوز حد الائتمان' : ''}><FileText />فاتورة آجل</Button>
+        <Button variant="outline" disabled={closed} onClick={() => open({ type: 'return' })}><ArrowRight />مرتجع</Button>
+        <Button variant="success" disabled={closed} onClick={() => open({ type: 'collect' })}><Wallet />تسجيل تحصيل</Button>
       </div>
     </Greeting>
+    {closed ? <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-4">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background"><Lock className="size-4" /></span>
+      <div className="min-w-0 flex-[1_1_240px] text-sm"><div className="font-semibold">اليوم اتقفل الساعة {new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(closedToday.created_at))}</div>
+        <div className="mt-0.5 text-muted-foreground">تحصيل {money(closedToday.collections)} · ورّدت <span className="tnum font-medium text-foreground">{money(closedToday.remitted)}</span> ج.م. تقدر تسجّل تاني من بكرة.</div></div>
+    </div> : <div className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+      <div className="grid min-w-0 flex-[1_1_260px] grid-cols-3 gap-3 text-sm">
+        <div><div className="text-xs text-muted-foreground">تحصيل النهارده</div><div className="tnum font-semibold text-success">{money(today.collections)}</div></div>
+        <div><div className="text-xs text-muted-foreground">فواتير النهارده</div><div className="tnum font-semibold">{money(today.invoices)}</div></div>
+        <div><div className="text-xs text-muted-foreground">مرتجعات</div><div className="tnum font-semibold">{money(today.returns)}</div></div>
+      </div>
+      <Button variant="outline" className="max-sm:w-full" onClick={() => open({ type: 'close-day' })}><Lock />تقفيل اليوم والتوريد</Button>
+    </div>}
     {sum.over && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4">
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-danger text-white"><Lock className="size-4" /></span>
       <div><div className="font-semibold text-danger">تم إيقاف البيع الآجل</div><p className="mt-0.5 text-sm text-foreground/80">مديونيتك {money(sum.total)} ج.م تجاوزت حد الائتمان ({money(sum.limit)}) بمبلغ {money(sum.total - sum.limit)} ج.م. التحصيل متاح، وبمجرد ما المديونية تنزل تحت الحد هتقدر تسجل فواتير تاني.</p></div>
@@ -65,7 +80,8 @@ export function AdminHome() {
   const total = sums.reduce((a, x) => a + x.s.total, 0), month = sums.reduce((a, x) => a + x.s.month, 0);
   const stopped = sums.filter((x) => x.s.over).length;
   const overdueAmt = overdue.reduce((a, c) => a + stats.get(c.id).balance, 0);
-  const pendTx = data.transactions.filter((t) => t.status === 'pending').length, pendAcc = raw.profiles.filter((r) => r.role === 'rep' && !r.active).length;
+  const pendTx = data.transactions.filter((t) => t.status === 'pending').length + data.customers.filter((c) => c.status === 'pending').length, pendAcc = raw.profiles.filter((r) => r.role === 'rep' && !r.active).length;
+  const todayKey = dayKey(); const todayCol = data.transactions.filter((t) => t.kind === 'collection' && t.status === 'approved' && dayKey(t.occurred_at) === todayKey).reduce((a, t) => a + Number(t.amount), 0);
   const recent = data.transactions.filter((t) => t.status === 'approved' && t.kind === 'collection').sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)).slice(0, 6);
   const [q, setQ] = useState('');
   return <>
@@ -80,12 +96,12 @@ export function AdminHome() {
     </Greeting>
     {(pendTx > 0 || pendAcc > 0) && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4">
       <BellRing className="size-5 shrink-0 text-warning" />
-      <div className="min-w-0 flex-[1_1_220px] text-sm"><span className="font-semibold">مطلوب مراجعتك: </span>{[pendTx ? `${pendTx} طلب تصحيح` : '', pendAcc ? `${pendAcc} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</div>
+      <div className="min-w-0 flex-[1_1_220px] text-sm"><span className="font-semibold">مطلوب مراجعتك: </span>{[pendTx ? `${pendTx} طلب (تصحيح أو مرتجع أو تكويد)` : '', pendAcc ? `${pendAcc} حساب مندوب جديد` : ''].filter(Boolean).join(' و ')}</div>
       <div className="flex w-full gap-2 sm:w-auto [&>button]:max-sm:h-10 [&>button]:max-sm:flex-1">{pendTx > 0 && <Button size="sm" variant="outline" onClick={() => nav('approvals')}>مراجعة الطلبات</Button>}{pendAcc > 0 && <Button size="sm" variant="outline" onClick={() => nav('accounts')}>تفعيل الحسابات</Button>}</div>
     </div>}
     <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={Wallet} label="إجمالي الآجل في السوق" value={money(total)} sub={totalSub} tone="brand" />
-      <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
+      <StatCard icon={TrendingDown} label="تحصيل النهارده" value={money(todayCol)} sub={`الشهر: ${money(month)}`} tone="success" />
       <StatCard icon={Lock} label="مناديب تجاوزوا الحد" value={stopped} sub={stopped ? 'موقوفين عن البيع الآجل' : 'الكل داخل الحد'} tone={stopped ? 'danger' : 'default'} />
       <StatCard icon={AlertTriangle} label="عملاء متأخرين" value={overdue.length} sub={`بإجمالي ${money(overdueAmt)} ج.م`} tone={overdue.length ? 'danger' : 'default'} />
     </div>
@@ -164,33 +180,57 @@ export function OverduePage() {
 }
 
 function RequestRow({ t }) {
-  const { api, data, nameOf, me, toast, go } = useApp();
+  const { api, data, nameOf, me, toast, go, can } = useApp();
   const c = data.customers.find((x) => x.id === t.customer_id);
-  const act = async (ok) => { try { await api.reviewTransaction(t.id, ok); toast(ok ? 'تمت الموافقة على التصحيح' : 'تم رفض الطلب'); } catch (e) { toast(e.message, 'err'); } };
+  const isRet = t.kind === 'return';
+  const act = async (ok) => { try { await api.reviewTransaction(t.id, ok); toast(ok ? (isRet ? 'تمت الموافقة على المرتجع' : 'تمت الموافقة على التصحيح') : 'تم رفض الطلب'); } catch (e) { toast(e.message, 'err'); } };
   return <div className="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-    <span className={cn('inline-flex size-10 shrink-0 items-center justify-center rounded-full', t.amount < 0 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning')}><PencilLine className="size-4" /></span>
+    <span className={cn('inline-flex size-10 shrink-0 items-center justify-center rounded-full', isRet ? 'bg-brand-soft text-brand' : t.amount < 0 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning')}>{isRet ? <ArrowRight className="size-4" /> : <PencilLine className="size-4" />}</span>
     <div className="min-w-0 flex-[1_1_220px]">
       <div className="flex flex-wrap items-center gap-2"><button className="font-semibold hover:underline" onClick={() => go({ name: 'customer', id: t.customer_id })}>{c?.name}</button><span className="text-xs text-muted-foreground">{nameOf(t.created_by)} · {fmtDT(t.created_at)}</span></div>
-      <p className="mt-1 text-sm"><span className="font-medium">{t.amount < 0 ? 'تقليل المديونية' : 'زيادة المديونية'} {money(Math.abs(t.amount))} ج.م</span><span className="text-muted-foreground"> · {t.note}</span></p>
+      <p className="mt-1 text-sm"><span className="font-medium">{isRet ? 'مرتجع' : t.amount < 0 ? 'تصحيح: تقليل المديونية' : 'تصحيح: زيادة المديونية'} {money(Math.abs(t.amount))} ج.م</span><span className="text-muted-foreground"> · {t.note}</span></p>
     </div>
-    {t.status === 'pending' ? (me.role === 'admin' ? <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto"><Button size="sm" variant="outline" className="max-sm:h-10" onClick={() => act(false)}><X />رفض</Button><Button size="sm" className="max-sm:h-10" onClick={() => act(true)}><Check />موافقة</Button></div> : <Badge variant="warning" dot>بانتظار الإدارة</Badge>)
+    {t.status === 'pending' ? (me.role === 'admin' && can('review') ? <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto"><Button size="sm" variant="outline" className="max-sm:h-10" onClick={() => act(false)}><X />رفض</Button><Button size="sm" className="max-sm:h-10" onClick={() => act(true)}><Check />موافقة</Button></div> : <Badge variant="warning" dot>{me.role === 'admin' ? 'بانتظار المحاسب' : 'بانتظار الإدارة'}</Badge>)
       : <Badge variant={t.status === 'approved' ? 'success' : 'outline'} dot>{t.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</Badge>}
+  </div>;
+}
+
+function CodingRow({ c }) {
+  const { api, nameOf, toast, can, data, go } = useApp();
+  const next = String(Math.max(1000, ...data.customers.map((x) => Number(x.code) || 0)) + 1);
+  const [code, setCode] = useState(next);
+  const [busy, setBusy] = useState(false);
+  const act = async (ok) => { setBusy(true); try { await api.codeCustomer(c.id, ok, code); toast(ok ? `اتكوّد ${c.name} بكود ${code}` : `اترفض طلب ${c.name}`); } catch (e) { toast(e.message, 'err'); } finally { setBusy(false); } };
+  return <div className="flex flex-wrap items-center gap-4 rounded-lg border p-4" data-coding={c.id}>
+    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"><UserPlus className="size-4" /></span>
+    <div className="min-w-0 flex-[1_1_220px]">
+      <div className="flex flex-wrap items-center gap-2"><button className="font-semibold hover:underline" onClick={() => go({ name: 'customer', id: c.id })}>{c.name}</button><span className="text-xs text-muted-foreground">{nameOf(c.created_by)} · {fmtDT(c.created_at)}</span></div>
+      <p className="mt-1 text-sm text-muted-foreground">{[c.owner_name, c.location, c.phone].filter(Boolean).join(' · ')}{Number(c.opening_amount) > 0 && <> · رصيد افتتاحي <span className="tnum font-medium text-foreground">{money(c.opening_amount)}</span></>}</p>
+    </div>
+    {can('coding') ? <div className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 sm:flex sm:w-auto">
+      <Input aria-label="كود العميل" value={code} onChange={(e) => setCode(e.target.value)} dir="ltr" className="text-center sm:w-28" />
+      <Button size="sm" variant="outline" className="max-sm:h-10" disabled={busy} onClick={() => act(false)}><X />رفض</Button>
+      <Button size="sm" className="max-sm:h-10" disabled={busy} onClick={() => act(true)}><Check />تكويد</Button>
+    </div> : <Badge variant="warning" dot>بانتظار المحاسب</Badge>}
   </div>;
 }
 
 export function ApprovalsPage() {
   const { data } = useApp();
   const pending = data.transactions.filter((t) => t.status === 'pending');
-  const done = data.transactions.filter((t) => t.kind === 'correction' && t.status !== 'pending').sort((a, b) => new Date(b.reviewed_at || b.created_at) - new Date(a.reviewed_at || a.created_at)).slice(0, 20);
+  const coding = data.customers.filter((c) => c.status === 'pending');
+  const done = data.transactions.filter((t) => (t.kind === 'correction' || t.kind === 'return') && t.status !== 'pending' && t.reviewed_at).sort((a, b) => new Date(b.reviewed_at || b.created_at) - new Date(a.reviewed_at || a.created_at)).slice(0, 20);
   return <>
-    <Card><CardHeader><div><CardTitle>بانتظار موافقتك</CardTitle><CardDescription>المندوب لا يستطيع تعديل أو حذف أي حركة. التصحيح يُطبق فقط بعد موافقتك.</CardDescription></div></CardHeader>
+    <Card><CardHeader><div><CardTitle>طلبات تكويد عملاء جدد</CardTitle><CardDescription>العميل الجديد مش بيتسجل عليه فواتير ولا تحصيل غير بعد ما ياخد كود.</CardDescription></div></CardHeader>
+      <CardContent className="grid gap-3">{coding.length ? coding.map((c) => <CodingRow key={c.id} c={c} />) : <Empty icon={UserPlus} title="مفيش طلبات تكويد" />}</CardContent></Card>
+    <Card><CardHeader><div><CardTitle>تصحيحات ومرتجعات بانتظار الموافقة</CardTitle><CardDescription>المندوب لا يستطيع تعديل أو حذف أي حركة. التصحيح والمرتجع بيتطبقوا بعد الموافقة بس.</CardDescription></div></CardHeader>
       <CardContent className="grid gap-3">{pending.length ? pending.map((t) => <RequestRow key={t.id} t={t} />) : <Empty icon={ClipboardCheck} title="لا توجد طلبات معلقة" />}</CardContent></Card>
-    {done.length > 0 && <Card><CardHeader><CardTitle>سجل التصحيحات</CardTitle></CardHeader><CardContent className="grid gap-3">{done.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
+    {done.length > 0 && <Card><CardHeader><CardTitle>سجل المراجعات</CardTitle></CardHeader><CardContent className="grid gap-3">{done.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
   </>;
 }
 
 function ActivateRow({ r }) {
-  const { api, toast, agencies, agency } = useApp();
+  const { api, toast, agencies, agency, can } = useApp();
   const { busy, error, submit } = useSubmit(async (fd) => {
     const limit = parseAmount(fd.get('limit')); if (!(limit > 0)) throw new Error('اكتب حد الائتمان بالأرقام');
     await api.updateProfile(r.id, { credit_limit: limit, rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null, active: true }); toast(`تم تفعيل حساب ${r.full_name}`);
@@ -200,8 +240,9 @@ function ActivateRow({ r }) {
       <div className="flex min-w-0 flex-[1_1_200px] items-center gap-3"><Avatar name={r.full_name.charAt(0)} tone="brand" /><div><div className="font-semibold">{r.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{r.username}</span> · سجّل {fmtDate(r.created_at)}</div></div></div>
       <div className="max-sm:w-full"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'} className="w-full sm:w-36"><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div>
       <div className="max-sm:w-full"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency} className="w-full sm:w-40">{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div>
-      <div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><MoneyInput name="limit" placeholder="500,000" className="w-full text-end sm:w-48" /></Field></div>
-      <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button>
+      {can('credit') ? <><div className="max-sm:w-full"><Field label="حد الائتمان (ج.م)"><MoneyInput name="limit" placeholder="500,000" className="w-full text-end sm:w-48" /></Field></div>
+      <Button type="submit" className="max-sm:w-full" disabled={busy}><Check />تفعيل الحساب</Button></>
+        : <p className="text-sm text-muted-foreground">التفعيل محتاج حد ائتمان، وده بيحدده المحاسب أو المدير العام.</p>}
     </div>
     <FormError>{error}</FormError>
   </form>;
@@ -215,12 +256,13 @@ export function AccountsPage() {
 }
 
 export function RepDetail({ id }) {
-  const { data, summaryOf, api, toast, back, agencies, agency, agencyName } = useApp();
+  const { data, summaryOf, api, toast, back, agencies, agency, agencyName, can } = useApp();
   const r = data.profiles.find((p) => p.id === id);
   const [confirmStop, setConfirmStop] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => {
-    const limit = parseAmount(fd.get('limit')); if (!(limit >= 0)) throw new Error('اكتب حد الائتمان بالأرقام');
-    await api.updateProfile(id, { credit_limit: limit, rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null }); toast('تم حفظ بيانات المندوب');
+    const patch = { rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null };
+    if (can('credit')) { const limit = parseAmount(fd.get('limit')); if (!(limit >= 0)) throw new Error('اكتب حد الائتمان بالأرقام'); patch.credit_limit = limit; }
+    await api.updateProfile(id, patch); toast('تم حفظ بيانات المندوب');
   });
   if (!r) return <Card><Empty title="المندوب غير موجود" /></Card>;
   const s = summaryOf(r);
@@ -234,7 +276,7 @@ export function RepDetail({ id }) {
     <div className="grid gap-6 xl:grid-cols-5">
       <div className="xl:col-span-2"><CreditCard sum={s} title={`${r.full_name} · ${REP_TYPE[r.rep_type] || 'مندوب'}${agencyName(r.agency_id) ? ' · ' + agencyName(r.agency_id) : ''}`}>
         <form onSubmit={submit} className="mt-5 grid gap-2 border-t pt-4">
-          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label="حد الائتمان"><MoneyInput name="limit" className="text-end" defaultValue={money(r.credit_limit)} /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><div className="flex-[1_1_110px]"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency}>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
+          <div className="flex flex-wrap items-end gap-2"><div className="flex-[1_1_140px]"><Field label={can('credit') ? 'حد الائتمان' : 'حد الائتمان (للمحاسب بس)'}><MoneyInput name="limit" className="text-end" defaultValue={money(r.credit_limit)} disabled={!can('credit')} /></Field></div><div className="flex-[1_1_110px]"><Field label="نوع المندوب"><Select name="rep_type" defaultValue={r.rep_type || 'retail'}><option value="retail">قطاعي</option><option value="wholesale">جملة</option></Select></Field></div><div className="flex-[1_1_110px]"><Field label="التوكيل"><Select name="agency_id" defaultValue={r.agency_id || agency}>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field></div><Button type="submit" variant="outline" disabled={busy}>حفظ</Button></div>
           <FormError>{error}</FormError>
         </form>
         <div className="mt-4 border-t pt-4">{confirmStop ? <div className="flex flex-wrap items-center gap-2 text-sm"><span className="flex-1">إيقاف الحساب يمنع المندوب من الدخول. متأكد؟</span><Button size="sm" variant="danger" onClick={async () => { await api.updateProfile(id, { active: false }); toast('تم إيقاف حساب ' + r.full_name); back(); }}>إيقاف</Button><Button size="sm" variant="outline" onClick={() => setConfirmStop(false)}>إلغاء</Button></div>
@@ -247,11 +289,13 @@ export function RepDetail({ id }) {
 }
 
 /* ================= customer ================= */
-const KIND_ICON = { opening: Archive, invoice: FileText, collection: TrendingDown, correction: PencilLine };
-const KIND_TONE = { opening: 'bg-muted text-muted-foreground', invoice: 'bg-brand-soft text-brand', collection: 'bg-success-soft text-success', correction: 'bg-warning-soft text-warning' };
+const KIND_ICON = { opening: Archive, invoice: FileText, collection: TrendingDown, return: ArrowRight, correction: PencilLine };
+const KIND_TONE = { opening: 'bg-muted text-muted-foreground', invoice: 'bg-brand-soft text-brand', collection: 'bg-success-soft text-success', return: 'bg-brand-soft text-brand', correction: 'bg-warning-soft text-warning' };
+const txTitle = (t) => (t.kind === 'invoice' && t.invoice_no ? `فاتورة رقم ${t.invoice_no}` : KIND[t.kind]);
+const txSub = (t) => [t.kind === 'invoice' && `تستحق ${fmtDate(dueOf(t))}`, t.note && t.note !== 'رصيد افتتاحي' && t.note].filter(Boolean).join(' · ');
 
 export function CustomerPage({ id }) {
-  const { data, stats, me, nameOf, summaryOf } = useApp();
+  const { data, stats, me, nameOf, summaryOf, can, closedToday } = useApp();
   const open = useDialogs();
   const [month, setMonth] = useState('all');
   const c = data.customers.find((x) => x.id === id);
@@ -268,25 +312,32 @@ export function CustomerPage({ id }) {
   const repSum = summaryOf(data.profiles.find((p) => p.id === c.rep_id) || me);
   const shown = rows.filter((x) => month === 'all' || monthKey(x.t.occurred_at) === month).reverse();
   const pending = s.list.filter((t) => t.status === 'pending');
+  const waiting = c.status === 'pending';
+  const locked = waiting || (isRep && !!closedToday);
   return <>
     <Card className={cn(s.overdue && 'border-danger/40')}>
       <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-5">
         <Avatar name={initials(c.name)} tone={s.overdue ? 'danger' : 'brand'} size="lg" className="max-sm:size-11 max-sm:text-base" />
         <div className="min-w-0 flex-[1_1_240px]">
-          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2><DueBadge s={s} /></div>
+          <div className="flex flex-wrap items-center gap-2"><h2 className={cn('text-lg font-bold sm:text-xl', s.overdue && 'text-danger')}>{c.name}</h2>{waiting ? <Badge variant="brand" dot>بانتظار التكويد</Badge> : <DueBadge s={s} />}{c.code && <Badge variant="outline">كود {c.code}</Badge>}</div>
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[0.875rem] text-muted-foreground">
+            {c.owner_name && <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" />صاحب المحل: <span className="font-medium text-foreground">{c.owner_name}</span></span>}
             {c.phone && <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5" /><span dir="ltr" className="select-all font-medium text-foreground">{c.phone}</span></span>}
             {c.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{c.location}</span>}
-            {!isRep && <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" />{nameOf(c.rep_id)}</span>}
+            {!isRep && <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" />المندوب: {nameOf(c.rep_id)}</span>}
             <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />عميل منذ {fmtDate(c.created_at)}</span>
           </div>
         </div>
         <div className="grid w-full auto-cols-fr grid-flow-col gap-2 sm:flex sm:w-auto [&>button]:max-sm:px-2">
           {isRep ? <>
-            <Button variant="outline" onClick={() => open({ type: 'correction', id })}><PencilLine />طلب تصحيح</Button>
-            <Button variant="outline" disabled={repSum.over} onClick={() => open({ type: 'invoice', id })}><FileText />فاتورة آجل</Button>
-            <Button variant="success" disabled={s.balance <= 0} onClick={() => open({ type: 'collect', id })}><Wallet />تحصيل</Button>
-          </> : <Button variant="outline" onClick={() => open({ type: 'correction', id })}><PencilLine />تصحيح الرصيد</Button>}
+            <Button variant="outline" disabled={locked} onClick={() => open({ type: 'correction', id })}><PencilLine />تصحيح</Button>
+            <Button variant="outline" disabled={locked || s.balance <= 0} onClick={() => open({ type: 'return', id })}><ArrowRight />مرتجع</Button>
+            <Button variant="outline" disabled={locked || repSum.over} onClick={() => open({ type: 'invoice', id })}><FileText />فاتورة</Button>
+            <Button variant="success" disabled={locked || s.balance <= 0} onClick={() => open({ type: 'collect', id })}><Wallet />تحصيل</Button>
+          </> : can('review') && !waiting ? <>
+            <Button variant="outline" disabled={s.balance <= 0} onClick={() => open({ type: 'return', id })}><ArrowRight />مرتجع</Button>
+            <Button variant="outline" onClick={() => open({ type: 'correction', id })}><PencilLine />تصحيح الرصيد</Button>
+          </> : null}
         </div>
       </div>
       <div className="grid grid-cols-2 border-t md:grid-cols-4 [&>div]:px-4 [&>div]:py-3 sm:[&>div]:p-5 [&>div:not(:first-child)]:md:border-s [&>div:nth-child(2)]:border-s [&>div:nth-child(n+3)]:max-md:border-t [&>div:nth-child(4)]:max-md:border-s">
@@ -296,17 +347,26 @@ export function CustomerPage({ id }) {
         <div><div className="text-xs text-muted-foreground">آخر تحصيل</div><div className="mt-1 text-base font-semibold sm:text-lg">{s.lastCollection ? fmtDate(s.lastCollection) : '—'}</div></div>
       </div>
     </Card>
-    {pending.length > 0 && <Card><CardHeader><CardTitle>طلبات تصحيح معلقة</CardTitle></CardHeader><CardContent className="grid gap-3">{pending.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
+    {waiting && <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand-soft p-4 text-sm"><UserPlus className="mt-0.5 size-5 shrink-0 text-brand" /><div>العميل ده طلب تكويد جديد{Number(c.opening_amount) > 0 && <> برصيد افتتاحي <span className="tnum font-semibold">{money(c.opening_amount)}</span> ج.م</>}. بعد ما ياخد كود من الإدارة هيتسجل رصيده وتقدر تسجّل عليه فواتير وتحصيل.</div></div>}
+    {s.openItems.length > 0 && <Card>
+      <CardHeader><div><CardTitle>الفواتير المفتوحة</CardTitle><CardDescription>التحصيل والمرتجع بيسددوا الأقدم الأول. كل فاتورة تستحق بعد {TERM_DAYS} يوم.</CardDescription></div></CardHeader>
+      <ul className="divide-y border-t">{s.openItems.map(({ t, left, due }) => { const late = Date.now() > due + DAY; return <li key={t.id} className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3', late && 'bg-danger-soft/50')}>
+        <div className="min-w-0 flex-[1_1_160px]"><div className="font-medium">{txTitle(t)}</div><div className="text-xs text-muted-foreground">بتاريخ {fmtDate(t.occurred_at)}</div></div>
+        <div className={cn('text-sm', late ? 'font-semibold text-danger' : 'text-muted-foreground')}>تستحق {fmtDate(due)}{late && ` · متأخرة ${Math.floor((Date.now() - due) / DAY)} يوم`}</div>
+        <div className="tnum ms-auto text-end font-semibold">{money(left)} <span className="text-xs font-normal text-muted-foreground">ج.م باقي</span></div>
+      </li>; })}</ul>
+    </Card>}
+    {pending.length > 0 && <Card><CardHeader><CardTitle>طلبات معلقة</CardTitle></CardHeader><CardContent className="grid gap-3">{pending.map((t) => <RequestRow key={t.id} t={t} />)}</CardContent></Card>}
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card>
         <CardHeader><div><CardTitle>كشف الحساب</CardTitle><CardDescription>{shown.length} حركة · كل حركة بتاريخها ومن سجّلها</CardDescription></div>
           <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full sm:w-44"><option value="all">كل الفترات</option>{months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}</Select></CardHeader>
-        <ul className="divide-y border-t md:hidden">{shown.map(({ t, run }) => { const e = t.kind === 'collection' ? -t.amount : Number(t.amount); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
+        <ul className="divide-y border-t md:hidden">{shown.map(({ t, run }) => { const e = signed(t); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
           <li key={t.id} className={cn('flex items-center gap-3 px-4 py-3', off && 'opacity-60')}>
             <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-full', KIND_TONE[t.kind])}><I className="size-4" /></span>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">{KIND[t.kind]}{t.status === 'pending' && <Badge variant="warning">معلق</Badge>}{t.status === 'rejected' && <Badge variant="outline">مرفوض</Badge>}</div>
-              <div className="truncate text-xs text-muted-foreground">{fmtDT(t.occurred_at)}{t.note && t.note !== 'رصيد افتتاحي' ? ' · ' + t.note : ''}</div>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">{txTitle(t)}{t.status === 'pending' && <Badge variant="warning">معلق</Badge>}{t.status === 'rejected' && <Badge variant="outline">مرفوض</Badge>}</div>
+              <div className="truncate text-xs text-muted-foreground">{fmtDT(t.occurred_at)}{txSub(t) ? ' · ' + txSub(t) : ''}</div>
             </div>
             <div className="shrink-0 text-end">
               <div dir="ltr" className={cn('tnum text-sm font-semibold', e < 0 ? 'text-success' : '', off && 'line-through')}>{e < 0 ? '−' : '+'}{money(Math.abs(e))}</div>
@@ -316,11 +376,11 @@ export function CustomerPage({ id }) {
         <div className="border-t max-md:hidden">
           <Table>
             <THead><TR className="bg-muted/40"><TH>التاريخ</TH><TH>البيان</TH><TH className="text-end">مدين</TH><TH className="text-end">دائن</TH><TH className="text-end">الرصيد</TH><TH className="max-md:hidden">بواسطة</TH></TR></THead>
-            <TBody>{shown.map(({ t, run }) => { const e = t.kind === 'collection' ? -t.amount : Number(t.amount); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
+            <TBody>{shown.map(({ t, run }) => { const e = signed(t); const off = t.status !== 'approved'; const I = KIND_ICON[t.kind]; return (
               <TR key={t.id} className={off ? 'opacity-60' : ''}>
                 <TD className="whitespace-nowrap text-xs text-muted-foreground">{fmtDT(t.occurred_at)}</TD>
                 <TD><div className="flex items-center gap-2.5"><span className={cn('inline-flex size-8 shrink-0 items-center justify-center rounded-full', KIND_TONE[t.kind])}><I className="size-3.5" /></span>
-                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5 font-medium">{KIND[t.kind]}{t.status === 'pending' && <Badge variant="warning">معلق</Badge>}{t.status === 'rejected' && <Badge variant="outline">مرفوض</Badge>}</div>{t.note && t.note !== 'رصيد افتتاحي' && <div className="max-w-[260px] truncate text-xs text-muted-foreground">{t.note}</div>}</div></div></TD>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5 font-medium">{txTitle(t)}{t.status === 'pending' && <Badge variant="warning">معلق</Badge>}{t.status === 'rejected' && <Badge variant="outline">مرفوض</Badge>}</div>{txSub(t) && <div className="max-w-[260px] truncate text-xs text-muted-foreground">{txSub(t)}</div>}</div></div></TD>
                 <TD className={cn('text-end tnum', off && 'line-through')}>{e > 0 ? money(e) : ''}</TD>
                 <TD className={cn('text-end tnum text-success', off && 'line-through')}>{e < 0 ? money(-e) : ''}</TD>
                 <TD className="text-end tnum font-semibold">{off ? '—' : money(run)}</TD>
@@ -393,7 +453,7 @@ export function LoginPage() {
     {api?.mode === 'demo' && <div className="rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium"><Zap className="size-3.5 text-warning" />نسخة تجريبية · دخول سريع (كلمة المرور 1234)</div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
+        {[['sayed', 'سيد', 'مدير عام'], ['mohamed', 'محمد', 'مدير عام'], ['barqi', 'محمد البرقي', 'مدير فرع تايجر'], ['younis', 'محمد يونس', 'مشرف تجزئة'], ['aref', 'أحمد عارف', 'مشرف جملة'], ['mokhtar', 'محمد مختار', 'محاسب الفرع'], ['ahmed', 'أحمد', 'مندوب تايجر · جملة'], ['karim', 'كريم', 'مندوب تايجر · قطاعي'], ['mahmoud', 'محمود', 'مندوب مولفيكس · قطاعي']].map(([u, n, l]) =>
           <button key={u} data-u={u} onClick={() => signIn(u, '1234')} className="flex items-center gap-2.5 rounded-md border bg-card p-2.5 text-start shadow-card hover:border-foreground/30"><Avatar name={n.charAt(0)} size="sm" tone="brand" /><span className="min-w-0"><span className="block text-sm font-medium">{n}</span><span className="block truncate text-[0.75rem] text-muted-foreground">{l}</span></span></button>)}
       </div>
     </div>}
@@ -428,7 +488,7 @@ function ManagerRow({ m }) {
       <div className="min-w-0 flex-1"><div className="font-semibold">{m.full_name}</div><div className="text-xs text-muted-foreground"><span dir="ltr">@{m.username}</span>{!m.active && ' · موقوف'}</div></div>
       <Input aria-label="المسمّى الوظيفي" key={m.title || ''} defaultValue={m.title || ''} placeholder="المسمّى (مثلاً: مشرف جملة)" disabled={busy} onBlur={(e) => { const v = e.target.value.trim(); if (v !== (m.title || '')) save({ title: v }, 'تم حفظ المسمّى'); }} className="w-full sm:w-56" />
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ active: !m.active }, m.active ? `تم إيقاف ${m.full_name}` : `تم تفعيل ${m.full_name}`)}>{m.active ? 'إيقاف' : 'تفعيل'}</Button>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ role: 'rep', scopes: [], active: false }, `${m.full_name} رجع حساب مندوب (موقوف)`)}>إلغاء الإدارة</Button>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => save({ role: 'rep', scopes: [], perms: [], active: false }, `${m.full_name} رجع حساب مندوب (موقوف)`)}>إلغاء الإدارة</Button>
     </div>
     <div className="grid gap-2">
       {raw.agencies.map((a) => <div key={a.id} className="flex flex-wrap items-center gap-2">
@@ -438,6 +498,10 @@ function ManagerRow({ m }) {
       </div>)}
     </div>
     {!scopes.length && <p className="text-xs text-warning">مش شايف أي حاجة لحد ما تختارله توكيل.</p>}
+    <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+      <span className="w-24 shrink-0 text-sm font-medium">يقدر</span>
+      {Object.entries(PERMS).map(([k, label]) => { const on = (m.perms || []).includes(k); return <ScopeChip key={k} disabled={busy} on={on} onClick={() => save({ perms: on ? (m.perms || []).filter((x) => x !== k) : [...(m.perms || []), k] })}>{label}</ScopeChip>; })}
+    </div>
   </div>;
 }
 
@@ -461,10 +525,10 @@ export function SettingsPage() {
   const managers = raw.profiles.filter((p) => p.role === 'admin' && !p.is_owner);
   const reps = raw.profiles.filter((p) => p.role === 'rep');
   const promotable = reps.filter((r) => !raw.customers.some((c) => c.rep_id === r.id));
-  const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [], title: 'مشرف' }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
+  const promote = async () => { const r = reps.find((x) => x.id === pick); if (!r) return; try { await api.updateProfile(r.id, { role: 'admin', active: true, scopes: [], perms: [], title: 'مشرف' }); toast(`${r.full_name} بقى مدير، اختارله هيشوف إيه`); setPick(''); } catch (e) { toast(e.message, 'err'); } };
   return <>
     <Card>
-      <CardHeader><div><CardTitle>المديرين</CardTitle><CardDescription>اختار لكل مدير التوكيل والنوع اللي يشوفه. المدير مش بيشوف غير مناديب وعملاء الحاجات اللي متعلّم عليها، والتعديل بيتحفظ على طول.</CardDescription></div></CardHeader>
+      <CardHeader><div><CardTitle>المديرين</CardTitle><CardDescription>اختار لكل مدير التوكيل والنوع اللي يشوفه، والحاجات اللي يقدر يعملها (حد الائتمان، التصحيح والمرتجعات، تكويد العملاء). التعديل بيتحفظ على طول.</CardDescription></div></CardHeader>
       <CardContent className="grid gap-3">
         {managers.length ? managers.map((m) => <ManagerRow key={m.id} m={m} />) : <Empty icon={Users} title="مفيش مديرين لسه" />}
         <div className="grid gap-2 rounded-lg border border-dashed p-4">
@@ -489,50 +553,63 @@ export function SettingsPage() {
   </>;
 }
 
-/* ================= daily debt report ================= */
+/* ================= daily debt report (any day from the calendar) ================= */
 export function ReportPage() {
-  const { data, reps, summaryOf, agencyName, agency, go, idleReps } = useApp();
-  const today = new Date().toDateString();
-  const isToday = (t) => new Date(t.created_at).toDateString() === today;
-  const idleIds = new Set(idleReps.map((r) => r.id));
+  const { data, reps, agencyName, agency, go } = useApp();
+  const todayK = dayKey();
+  const [day, setDay] = useState(todayK);
+  const isToday = day === todayK;
+  const end = new Date(day + 'T23:59:59.999').getTime();
+  const onDay = (t) => dayKey(t.occurred_at) === day;
   const rows = reps.filter((r) => r.active).map((r) => {
-    const s = summaryOf(r);
-    const tx = data.transactions.filter((t) => t.rep_id === r.id && t.status === 'approved' && (t.kind === 'invoice' || t.kind === 'collection'));
-    const td = tx.filter(isToday);
+    const tx = data.transactions.filter((t) => t.rep_id === r.id && t.status === 'approved');
+    const total = tx.filter((t) => new Date(t.occurred_at).getTime() <= end).reduce((a, t) => a + effect(t), 0); // debt at the end of that day
+    const td = tx.filter(onDay);
     const sum = (k) => td.filter((t) => t.kind === k).reduce((a, t) => a + Number(t.amount), 0);
-    const last = tx.reduce((m, t) => (t.created_at > m ? t.created_at : m), '');
-    return { r, s, inv: sum('invoice'), col: sum('collection'), moves: td.length, last };
-  }).sort((a, b) => b.s.pct - a.s.pct);
-  const total = rows.reduce((a, x) => a + x.s.total, 0);
-  const stopped = rows.filter((x) => x.s.over);
+    const closing = (data.closings || []).find((x) => x.rep_id === r.id && x.day === day);
+    const limit = Number(r.credit_limit) || 0;
+    return { r, total, limit, over: total > limit, pct: limit ? total / limit : 0, inv: sum('invoice'), col: sum('collection'), ret: sum('return'), moves: td.filter((t) => t.kind === 'invoice' || t.kind === 'collection').length, closing };
+  }).sort((a, b) => b.pct - a.pct);
+  const tot = (k) => rows.reduce((a, x) => a + (typeof k === 'function' ? k(x) : x[k]), 0);
+  const total = tot('total'), col = tot('col'), remitted = tot((x) => Number(x.closing?.remitted) || 0);
+  const stopped = rows.filter((x) => x.over);
   const idle = rows.filter((x) => !x.moves);
   return <>
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h2 className="text-2xl font-bold tracking-tight">تقرير المديونية</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</p></div>
-      <Button variant="outline" onClick={() => window.print()} className="print:hidden"><FileText />طباعة</Button>
+        <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}</p></div>
+      <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto print:hidden">
+        <div className="flex-[1_1_160px]"><Field label="اليوم"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" /></Field></div>
+        {!isToday && <Button variant="outline" onClick={() => setDay(todayK)}>النهارده</Button>}
+        <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
+      </div>
     </div>
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
-      <StatCard label="إجمالي المديونية" value={money(total)} sub={`${rows.length} مندوب`} icon={Wallet} />
+      <StatCard label={isToday ? 'إجمالي المديونية' : 'المديونية آخر اليوم'} value={money(total)} sub={`${rows.length} مندوب`} icon={Wallet} />
+      <StatCard label={isToday ? 'تحصيل النهارده' : 'تحصيل اليوم'} value={money(col)} sub={tot('ret') ? `ومرتجعات ${money(tot('ret'))}` : 'من غير المرتجعات'} icon={TrendingDown} tone="success" />
+      <StatCard label="توريدات اليوم" value={money(remitted)} sub={col - remitted > 0.009 ? `ناقص ${money(col - remitted)} عن التحصيل` : `${rows.filter((x) => x.closing).length} من ${rows.length} قفلوا اليوم`} icon={Archive} tone={col - remitted > 0.009 ? 'warning' : undefined} />
       <StatCard label="موقوفين عن البضاعة" value={stopped.length} sub={stopped.length ? stopped.map((x) => x.r.full_name).join('، ') : 'كله تحت الحد'} icon={Lock} tone={stopped.length ? 'danger' : undefined} />
-      <StatCard label="مسجلوش حركة النهارده" value={idle.length} sub={idle.length ? idle.map((x) => x.r.full_name).join('، ') : 'كله اشتغل'} icon={Clock} tone={idle.length ? 'warning' : undefined} />
+      <StatCard label={isToday ? 'مسجلوش حركة النهارده' : 'مسجلوش حركة اليوم ده'} value={idle.length} sub={idle.length ? idle.map((x) => x.r.full_name).join('، ') : 'كله اشتغل'} icon={Clock} tone={idle.length ? 'warning' : undefined} />
     </div>
-    {stopped.length > 0 && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm">
+    {stopped.length > 0 && isToday && <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft p-4 text-sm">
       <Lock className="mt-0.5 size-5 shrink-0 text-danger" />
       <div>المندوب اللي عدّى حد الائتمان حسابه بيتقفل على الفواتير الجديدة تلقائياً، يعني <span className="font-semibold">ميخدش بضاعة</span> لحد ما يحصّل وينزل تحت الحد. التحصيل مفتوح له عادي.</div>
     </div>}
     <Card>
-      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>مرتبين من الأقرب للحد. "النهارده" يعني الفواتير والتحصيلات اللي اتسجلت النهارده.</CardDescription></div></CardHeader>
-      <CardContent className="p-0">{rows.length ? <Table><THead><TR><TH>المندوب</TH><TH className="text-end">المديونية</TH><TH className="text-end">الحد</TH><TH className="text-end">فواتير النهارده</TH><TH className="text-end">تحصيل النهارده</TH><TH>آخر حركة</TH><TH>الحالة</TH></TR></THead>
-        <TBody>{rows.map(({ r, s, inv, col, moves, last }) => <TR key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => go({ name: 'rep', id: r.id })}>
+      <CardHeader><div><CardTitle>المناديب</CardTitle><CardDescription>مرتبين من الأقرب للحد. المرتجعات بتقلل المديونية بس مش بتتحسب تحصيل.</CardDescription></div></CardHeader>
+      <CardContent className="p-0">{rows.length ? <Table><THead><TR><TH>المندوب</TH><TH className="text-end">المديونية</TH><TH className="text-end">الحد</TH><TH className="text-end">فواتير</TH><TH className="text-end">تحصيل</TH><TH className="text-end">مرتجع</TH><TH className="text-end">توريد</TH><TH>الحالة</TH></TR></THead>
+        <TBody>{rows.map(({ r, total, limit, over, pct, inv, col, ret, moves, closing }) => <TR key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => go({ name: 'rep', id: r.id })}>
           <TD><div className="font-medium">{r.full_name}</div><div className="text-xs text-muted-foreground">{REP_TYPE[r.rep_type] || ''}</div></TD>
-          <TD className={cn('tnum text-end font-semibold', s.over && 'text-danger')}>{money(s.total)}</TD>
-          <TD className="tnum text-end text-muted-foreground">{money(s.limit)}</TD>
+          <TD className={cn('tnum text-end font-semibold', over && 'text-danger')}>{money(total)}</TD>
+          <TD className="tnum text-end text-muted-foreground">{money(limit)}</TD>
           <TD className="tnum text-end">{inv ? money(inv) : '—'}</TD>
           <TD className="tnum text-end">{col ? money(col) : '—'}</TD>
-          <TD className="whitespace-nowrap text-xs text-muted-foreground">{last ? fmtDT(last) : '—'}</TD>
-          <TD><div className="flex flex-wrap gap-1">{s.over ? <Badge variant="danger" dot>موقوف عن البضاعة</Badge> : s.pct >= 0.9 ? <Badge variant="warning" dot>قرب من الحد</Badge> : <Badge variant="success" dot>متاح</Badge>}
-            {!moves && <Badge variant={idleIds.has(r.id) ? 'warning' : 'default'}>مفيش حركة النهارده</Badge>}</div></TD>
+          <TD className="tnum text-end">{ret ? money(ret) : '—'}</TD>
+          <TD className={cn('tnum text-end', closing && Number(closing.remitted) < col - 0.009 && 'font-semibold text-warning')}>{closing ? money(closing.remitted) : '—'}</TD>
+          <TD><div className="flex flex-wrap gap-1">{over ? <Badge variant="danger" dot>موقوف عن البضاعة</Badge> : pct >= 0.9 ? <Badge variant="warning" dot>قرب من الحد</Badge> : <Badge variant="success" dot>متاح</Badge>}
+            {closing ? <Badge variant="outline">قفل {new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(closing.created_at))}</Badge> : <Badge variant="default">مقفلش</Badge>}
+            {!moves && <Badge variant="warning">مفيش حركة</Badge>}</div>
+            {closing?.note && <div className="mt-1 text-xs text-muted-foreground">{closing.note}</div>}</TD>
         </TR>)}</TBody></Table> : <Empty icon={Users} title="لا يوجد مناديب مفعّلين" />}</CardContent>
     </Card>
   </>;

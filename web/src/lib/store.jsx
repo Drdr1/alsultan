@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner } from './core.js';
+import { LIVE, TERM_DAYS, DemoBackend, SupabaseBackend, analyzeCustomer, repSummary, KIND, money, isOwner, hasPerm, dayKey } from './core.js';
 import { useToast } from '../components/ui.jsx';
 import { notify, permission, onTarget, peekTarget, takeTarget } from './notify.js';
 
@@ -13,7 +13,7 @@ export function AppProvider({ children }) {
   const [api, setApi] = useState(null);
   const [boot, setBoot] = useState({ ready: false, error: '' });
   const [me, setMe] = useState(null);
-  const [raw, setData] = useState({ agencies: [], profiles: [], customers: [], transactions: [] });
+  const [raw, setData] = useState({ agencies: [], profiles: [], customers: [], transactions: [], closings: [] });
   const [agency, setAgencyState] = useState(() => { try { return sessionStorage.getItem('alsultan-agency') || 'all'; } catch { return 'all'; } });
   const setAgency = (a) => { setAgencyState(a); try { sessionStorage.setItem('alsultan-agency', a); } catch { /* storage blocked */ } };
   const [live, setLive] = useState('SUBSCRIBED');
@@ -30,10 +30,12 @@ export function AppProvider({ children }) {
   const activeAgency = me?.role !== 'admin' || !agencies.length ? 'all' : (agencies.some((a) => a.id === agency) ? agency : agencies[0].id);
   // Admin can narrow every page to one agency: filter the data once, here.
   const data = useMemo(() => {
-    if (activeAgency === 'all') return raw;
+    const live = (c) => c.status !== 'rejected'; // refused coding requests disappear from the lists
+    const closings = raw.closings || [];
+    if (activeAgency === 'all') return { ...raw, closings, customers: raw.customers.filter(live) };
     const profiles = raw.profiles.filter((p) => p.role === 'admin' || p.agency_id === activeAgency);
     const repIds = new Set(profiles.filter((p) => p.role === 'rep').map((p) => p.id));
-    return { ...raw, profiles, customers: raw.customers.filter((c) => repIds.has(c.rep_id)), transactions: raw.transactions.filter((t) => repIds.has(t.rep_id)) };
+    return { ...raw, profiles, customers: raw.customers.filter((c) => live(c) && repIds.has(c.rep_id)), transactions: raw.transactions.filter((t) => repIds.has(t.rep_id)), closings: closings.filter((x) => repIds.has(x.rep_id)) };
   }, [raw, activeAgency]);
   const agencyName = useCallback((id) => agencies.find((a) => a.id === id)?.name || '', [agencies]);
   const meRef = useRef(null); meRef.current = me;
@@ -159,8 +161,10 @@ export function AppProvider({ children }) {
   const nav = (name) => { setView({ name }); setStack([]); window.scrollTo({ top: 0 }); };
 
   const signIn = async (u, p) => { const m = await api.signIn(u, p); setMe(m); setView({ name: 'home' }); setStack([]); await reload(); };
-  const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [] }); setView({ name: 'home' }); setStack([]); };
+  const signOut = async () => { await api.signOut(); setMe(null); setData({ agencies: [], profiles: [], customers: [], transactions: [], closings: [] }); setView({ name: 'home' }); setStack([]); };
 
-  const value = { api, boot, me, owner, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
+  const can = useCallback((k) => hasPerm(me, k), [me]);
+  const closedToday = me?.role === 'rep' ? (raw.closings || []).find((x) => x.rep_id === me.id && x.day === dayKey()) || null : null;
+  const value = { api, boot, me, owner, can, closedToday, overLimit, idleReps, data, raw, agencies, agency: activeAgency, setAgency, agencyName, stats, reps, overdue, live, view, stack, go, back, nav, signIn, signOut, reload, nameOf, summaryOf, toast };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
