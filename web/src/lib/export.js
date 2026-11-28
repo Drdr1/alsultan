@@ -13,3 +13,16 @@ export function downloadCSV(filename, sections) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename.endsWith('.csv') ? filename : filename + '.csv';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Real Excel workbook with several sheets (right-to-left). The library loads only when someone exports.
+export async function downloadXLSX(filename, sheets) {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.utils.book_new();
+  wb.Workbook = { Views: [{ RTL: true }] };
+  for (const s of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet([...(s.title ? [[s.title], []] : []), s.head, ...s.rows]);
+    ws['!cols'] = s.head.map((h, i) => ({ wch: Math.min(40, Math.max(String(h).length, ...s.rows.slice(0, 300).map((r) => String(r[i] ?? '').length)) + 2) }));
+    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31));
+  }
+  XLSX.writeFile(wb, filename.endsWith('.xlsx') ? filename : filename + '.xlsx');
+}

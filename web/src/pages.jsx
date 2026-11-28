@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, ChevronRight, Search, ArrowRight, Download } from './components/icons.jsx';
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, dayLabeler, missingFor, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
-import { downloadCSV } from './lib/export.js';
+import { downloadXLSX } from './lib/export.js';
 import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
 import { Segmented, MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
@@ -570,7 +570,7 @@ export function SettingsPage() {
 
 /* ================= daily debt report (any day from the calendar) ================= */
 export function ReportPage() {
-  const { data, reps, agencyName, agency, go, nameOf } = useApp();
+  const { data, raw, stats, owner, can, reps, agencyName, agency, go, nameOf } = useApp();
   const todayK = dayKey();
   const [day, setDay] = useState(todayK);
   const isToday = day === todayK;
@@ -600,16 +600,36 @@ export function ReportPage() {
   const custName = (id) => data.customers.find((c) => c.id === id)?.name || '—';
   const time = (x) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(x));
   const list = tab === 'customers' ? null : dayTx.filter((t) => t.kind === tab);
-  const exportDay = () => downloadCSV(`alsultan-day-${day}`, [
-    { title: `النتيجة اليومية ${day}${agency !== 'all' && agencyName(agency) ? ' - ' + agencyName(agency) : ''}`, head: ['المندوب', 'النوع', 'المديونية', 'الحد', 'فواتير', 'تحصيل', 'مرتجع', 'توريد', 'الحالة', 'التقفيل'],
+  const exportDay = () => downloadXLSX(`alsultan-day-${day}`, [
+    { name: 'المناديب', title: `النتيجة اليومية ${day}${agency !== 'all' && agencyName(agency) ? ' - ' + agencyName(agency) : ''}`, head: ['المندوب', 'النوع', 'المديونية', 'الحد', 'فواتير', 'تحصيل', 'مرتجع', 'توريد', 'الحالة', 'التقفيل'],
       rows: [...rows.map((x) => [x.r.full_name, REP_TYPE[x.r.rep_type] || '', x.total, x.limit, x.inv, x.col, x.ret, x.closing ? Number(x.closing.remitted) : '', x.over ? 'موقوف عن البضاعة' : x.pct >= 0.9 ? 'قرب من الحد' : 'متاح', x.closing ? 'قفل' : 'مقفلش']),
         ['الإجمالي', '', total, tot('limit'), tot('inv'), col, tot('ret'), remitted, '', `${closedN} من ${rows.length}`]] },
-    { title: 'حركة اليوم', head: ['الوقت', 'النوع', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ'],
+    { name: 'حركة اليوم', head: ['الوقت', 'النوع', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ'],
       rows: dayTx.map((t) => [time(t.created_at), KIND[t.kind] || t.kind, custName(t.customer_id), nameOf(t.rep_id), t.invoice_no || '', Number(t.amount)]) },
-    { title: 'عملاء جدد', head: ['المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'الكود', 'الحالة'],
+    { name: 'عملاء جدد', head: ['المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'الكود', 'الحالة'],
       rows: newCust.map((c) => [c.name, c.owner_name || '', c.phone || '', c.location || '', nameOf(c.rep_id), c.code || '', c.status === 'pending' ? 'بانتظار التكويد' : 'متكوّد']) },
   ]);
-  return <>
+  const [backing, setBacking] = useState(false);
+  const backup = async () => {
+    setBacking(true);
+    try {
+      const pn = (id) => raw.profiles.find((p) => p.id === id)?.full_name || '';
+      const ag = (id) => raw.agencies.find((a) => a.id === id)?.name || '';
+      const cu = new Map(raw.customers.map((c) => [c.id, c]));
+      const dt = (x) => (x ? new Date(x).toLocaleString('en-GB', { hour12: false }) : '');
+      const st = { approved: 'معتمد', pending: 'معلق', rejected: 'مرفوض' };
+      await downloadXLSX(`alsultan-backup-${todayK}`, [
+        { name: 'العملاء', head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'التوكيل', 'النوع', 'الحالة', 'الرصيد', 'متأخر (يوم)', 'تاريخ التسجيل'],
+          rows: raw.customers.map((c) => { const x = stats.get(c.id) || {}; return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', pn(c.rep_id), ag(c.agency_id), TYPE[c.debt_type] || '', st[c.status || 'approved'] || c.status, x.balance ?? '', x.overdue ? x.overdueDays : '', dt(c.created_at)]; }) },
+        { name: 'كل الحركات', head: ['التاريخ', 'النوع', 'كود العميل', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ', 'أثره على الرصيد', 'الحالة', 'ملاحظة', 'سجّلها', 'وقت التسجيل', 'راجعها'],
+          rows: [...raw.transactions].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at)).map((t) => { const c = cu.get(t.customer_id) || {}; return [dt(t.occurred_at), KIND[t.kind] || t.kind, c.code || '', c.name || '', pn(t.rep_id), t.invoice_no || '', Number(t.amount), t.status === 'approved' ? effect(t) : 0, st[t.status] || t.status, t.note || '', pn(t.created_by), dt(t.created_at), pn(t.reviewed_by)]; }) },
+        { name: 'المناديب', head: ['المندوب', 'اسم الدخول', 'التوكيل', 'النوع', 'حد الائتمان', 'المديونية', 'مفعّل'],
+          rows: raw.profiles.filter((p) => p.role === 'rep').map((r) => [r.full_name, r.username || '', ag(r.agency_id), REP_TYPE[r.rep_type] || '', Number(r.credit_limit) || 0, raw.customers.filter((c) => c.rep_id === r.id).reduce((a, c) => a + (stats.get(c.id)?.balance || 0), 0), r.active ? 'أيوه' : 'لأ']) },
+        { name: 'التقفيلات', head: ['المندوب', 'اليوم', 'وقت التقفيل', 'تحصيل', 'فواتير', 'مرتجعات', 'توريد'],
+          rows: [...(raw.closings || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((x) => [pn(x.rep_id), x.day, dt(x.created_at), Number(x.collections), Number(x.invoices), Number(x.returns), Number(x.remitted)]) },
+      ]);
+    } finally { setBacking(false); }
+  };  return <>
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h2 className="text-2xl font-bold tracking-tight">النتيجة اليومية</h2>
         <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}{!isToday && <> · <button className="font-medium text-brand hover:underline print:hidden" onClick={() => setDay(todayK)}>النهارده</button></>}</p></div>
@@ -619,9 +639,10 @@ export function ReportPage() {
           <div className="min-w-0 overflow-hidden rounded-md"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" className="block w-full min-w-0 appearance-none sm:w-44" /></div>
           <Button variant="outline" size="icon" aria-label="اليوم اللي بعده" disabled={isToday} onClick={() => shift(1)}><ChevronLeft /></Button>
         </div>
-        <div className="flex gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+        <div className="flex flex-wrap gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
           <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
           <Button variant="outline" onClick={exportDay}><Download />تصدير Excel</Button>
+          {(owner || can('credit')) && <Button variant="outline" disabled={backing} onClick={backup}><Archive />نسخة كاملة</Button>}
         </div>
       </div>
     </div>
