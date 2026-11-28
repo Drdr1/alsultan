@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Search, Store, Wallet, ChevronLeft, AlertTriangle } from './icons.jsx';
+import { Search, Store, Wallet, ChevronLeft, AlertTriangle, FileText, Download } from './icons.jsx';
+import { downloadCSV } from '../lib/export.js';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { money, TERM_DAYS, TYPE, REP_TYPE, DAY, startOfDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
@@ -43,6 +44,10 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
     if (showRep && type !== 'all') r = r.filter((c) => repType(c.rep_id) === type);
     return r.sort((a, b) => (stats.get(b.id).overdue - stats.get(a.id).overdue) || (stats.get(b.id).balance - stats.get(a.id).balance));
   }, [list, q, type, stats]);
+  const exportRows = () => downloadCSV(`alsultan-customers-${new Date().toISOString().slice(0, 10)}`, [{
+    head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'الرصيد', 'تحصيل الشهر', 'متأخر (يوم)'],
+    rows: rows.map((c) => { const s = stats.get(c.id); return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', nameOf(c.rep_id), s.balance, s.monthCollected ?? '', s.overdue ? s.overdueDays : '']; }),
+  }]);
   return <div className="grid gap-4">
     <div className="flex flex-wrap items-center gap-3 px-5">
       <div className="relative min-w-0 flex-[1_1_220px]">
@@ -50,6 +55,10 @@ export function CustomerTable({ list, showRep = false, onCollect, initialQuery =
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالمحل أو صاحبه أو الكود أو التليفون" className="ps-9" type="search" />
       </div>
       {showRep && <Segmented value={type} onChange={setType} options={[['all', 'كل المناديب'], ['retail', 'مناديب القطاعي'], ['wholesale', 'مناديب الجملة']]} />}
+      {rows.length > 0 && <div className="flex gap-2 print:hidden">
+        <Button variant="outline" size="icon" aria-label="طباعة" title="طباعة" onClick={() => window.print()}><FileText /></Button>
+        <Button variant="outline" size="icon" aria-label="تصدير Excel" title="تصدير Excel" onClick={exportRows}><Download /></Button>
+      </div>}
     </div>
     {rows.length === 0 ? <Empty icon={Store} title={list.length ? 'لا توجد نتائج' : 'لا يوجد عملاء بعد'}>{list.length ? '' : emptyText}</Empty> : <>
       {/* desktop table */}

@@ -457,6 +457,19 @@ language sql immutable as $$
     case when coalesce(c.photo, '') = '' then 'صورة المحل' end), '')
 $$;
 
+-- One phone number = one customer (compared by digits; +20 / 0020 means 0).
+create or replace function public.norm_phone(p text) returns text
+language sql immutable as $$
+  select case when d like '0020%' then '0' || substr(d, 5) when d like '20%' and length(d) = 12 then '0' || substr(d, 3)
+              when length(d) = 10 and d like '1%' then '0' || d else d end
+  from (select regexp_replace(translate(coalesce(p, ''), '٠١٢٣٤٥٦٧٨٩', '0123456789'), '\D', '', 'g') as d) x
+$$;
+create unique index if not exists customers_phone_key on public.customers (public.norm_phone(phone)) where status <> 'rejected' and coalesce(phone, '') <> '';
+create or replace function public.phone_owner(p text) returns text
+language sql stable security definer set search_path = public as $$
+  select name from public.customers where status <> 'rejected' and public.norm_phone(phone) = public.norm_phone(p) limit 1
+$$;
+
 drop function if exists public.add_customer(text, text, text, text, numeric, timestamptz, uuid, text);
 create or replace function public.add_customer(
   p_name text, p_phone text, p_location text, p_debt_type text,
@@ -467,6 +480,7 @@ declare c public.customers;
 begin
   c.name := trim(p_name); c.owner_name := nullif(trim(p_owner_name),''); c.phone := nullif(trim(p_phone),''); c.location := nullif(trim(p_location),''); c.photo := nullif(p_photo,'');
   if public.customer_missing(c) is not null then raise exception 'ناقص: %', public.customer_missing(c); end if;
+  if public.phone_owner(c.phone) is not null then raise exception 'رقم التليفون ده متسجل لعميل تاني (%)', public.phone_owner(c.phone); end if;
   insert into public.customers (rep_id, name, owner_name, phone, location, photo, debt_type, opening_amount, opening_date)
   values (coalesce(p_rep_id, auth.uid()), c.name, c.owner_name, c.phone, c.location, c.photo, p_debt_type,
           greatest(coalesce(p_opening, 0), 0), p_opening_date)

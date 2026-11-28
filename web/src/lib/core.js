@@ -48,6 +48,8 @@ export function dayLabeler(closings, txs, repId) {
 }
 // The rep's open day started before today = he didn't close yesterday.
 export const unclosedDay = (closings, txs, repId, now = Date.now()) => { const d = openDay(closings, txs, repId).day; return d && d < dayKey(now) ? d : null; };
+// Phone numbers compared by digits only (+20 / 0020 prefix = 0).
+export const normPhone = (p) => { let d = String(p || '').replace(/[٠-٩]/g, (x) => '٠١٢٣٤٥٦٧٨٩'.indexOf(x)).replace(/\D/g, ''); if (d.startsWith('0020')) d = d.slice(4); if (d.startsWith('20') && d.length === 12) d = d.slice(2); if (d.length === 10 && d[0] === '1') d = '0' + d; return d; };
 // Everything a new customer needs before he can be coded (activated).
 export const missingFor = (c) => [!c.name && 'اسم المحل', !c.owner_name && 'اسم صاحب المحل', !c.phone && 'التليفون', !c.location && 'العنوان', !c.photo && 'صورة المحل'].filter(Boolean);
 export const dueOf = (t) => new Date(t.occurred_at).getTime() + (TERM_DAYS - 1) * DAY; // last day of the term for an invoice
@@ -310,6 +312,8 @@ export function DemoBackend() {
       const m = requireActive();
       const miss = missingFor({ name: (name || '').trim(), owner_name: (owner_name || '').trim(), phone: (phone || '').trim(), location: (location || '').trim(), photo });
       if (miss.length) throw new Error('ناقص: ' + miss.join('، '));
+      const taken = db.customers.find((x) => x.status !== 'rejected' && normPhone(x.phone) === normPhone(phone));
+      if (taken) throw new Error(`رقم التليفون ده متسجل لعميل تاني (${taken.name})`);
       if (m.role === 'admin' && rep_id && !repVisible(m, rep_id)) throw new Error('المندوب ده مش في توكيلك');
       const owner = m.role === 'admin' && rep_id ? db.profiles.find((x) => x.id === rep_id) : m;
       const debt_type = owner?.rep_type || 'retail';

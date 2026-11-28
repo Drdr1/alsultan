@@ -135,7 +135,7 @@ export function Layout({ children }) {
   const title = stack.length ? trail[trail.length - 1] : (me.role === 'rep' && active === 'home' ? 'الرئيسية' : TITLES[active]);
   return <div className="flex min-h-full">
     {/* sidebar */}
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e bg-sidebar lg:flex">
+    <aside className="print:!hidden sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e bg-sidebar lg:flex">
       <button onClick={() => nav('home')} className="flex items-center gap-3 px-5 py-5 text-start">
         <Logo /><span><span className="block font-bold leading-tight">السلطان للتوزيع</span><span className="block text-xs text-muted-foreground">دفتر المديونيات</span></span>
       </button>
@@ -156,7 +156,7 @@ export function Layout({ children }) {
     </aside>
 
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-2 sm:gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-8">
+      <header className="print:hidden sticky top-0 z-30 flex h-16 items-center gap-2 sm:gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-8">
         {!stack.length && <div className="lg:hidden"><Logo className="size-8" /></div>}
         {stack.length > 0 && <Button variant="outline" size="icon" onClick={back} aria-label="رجوع"><ArrowRight /></Button>}
         <div className="min-w-0 flex-1">
@@ -170,11 +170,11 @@ export function Layout({ children }) {
         <BellMenu />
         <Button variant="outline" size="icon" className="lg:hidden" onClick={signOut} aria-label="تسجيل الخروج"><LogOut /></Button>
       </header>
-      <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1800px] gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
+      <main className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1800px] gap-4 px-3 pb-28 pt-4 print:p-0 sm:gap-6 sm:px-4 sm:pt-6 md:px-8 lg:pb-10">
         <AgencyPicker className="md:hidden" />
         {!stack.length && view.name === 'home' && <NotifyPrompt />}
         {children}
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
+        <footer className="print:hidden flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
           {api?.mode === 'demo' ? <><span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-warning" />نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</span><button className="font-medium text-foreground hover:underline" onClick={() => api.resetDemo()}>استرجاع البيانات التجريبية</button></>
             : <span className="inline-flex items-center gap-1.5"><Archive className="size-3.5" />كل الحركات محفوظة في الأرشيف ولا تُحذف.</span>}
         </footer>
@@ -182,7 +182,7 @@ export function Layout({ children }) {
     </div>
 
     {/* mobile bottom nav */}
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+    <nav className="print:hidden fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
       {items.filter(([k]) => k !== 'settings' && k !== 'report').map(([k, I, l, n]) => <button key={k} onClick={() => nav(k)} className={cn('relative flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[0.75rem]', active === k ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
         <I className="size-5" /><span className="max-w-full truncate">{SHORT[k] || l}</span>
         {n > 0 && <span className="absolute top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-bold text-white" style={{ insetInlineStart: 'calc(50% + 4px)' }}>{n}</span>}

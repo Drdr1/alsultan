@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, ChevronRight, Search, ArrowRight } from './components/icons.jsx';
+import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, Users, Phone, MapPin, CalendarDays, PencilLine, Check, X, ClipboardCheck, Archive, ShieldCheck, Clock, Zap, BellRing, ChevronLeft, ChevronRight, Search, ArrowRight, Download } from './components/icons.jsx';
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, dayLabeler, missingFor, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
+import { downloadCSV } from './lib/export.js';
 import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
 import { Segmented, MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
@@ -599,15 +600,29 @@ export function ReportPage() {
   const custName = (id) => data.customers.find((c) => c.id === id)?.name || '—';
   const time = (x) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(x));
   const list = tab === 'customers' ? null : dayTx.filter((t) => t.kind === tab);
+  const exportDay = () => downloadCSV(`alsultan-day-${day}`, [
+    { title: `النتيجة اليومية ${day}${agency !== 'all' && agencyName(agency) ? ' - ' + agencyName(agency) : ''}`, head: ['المندوب', 'النوع', 'المديونية', 'الحد', 'فواتير', 'تحصيل', 'مرتجع', 'توريد', 'الحالة', 'التقفيل'],
+      rows: [...rows.map((x) => [x.r.full_name, REP_TYPE[x.r.rep_type] || '', x.total, x.limit, x.inv, x.col, x.ret, x.closing ? Number(x.closing.remitted) : '', x.over ? 'موقوف عن البضاعة' : x.pct >= 0.9 ? 'قرب من الحد' : 'متاح', x.closing ? 'قفل' : 'مقفلش']),
+        ['الإجمالي', '', total, tot('limit'), tot('inv'), col, tot('ret'), remitted, '', `${closedN} من ${rows.length}`]] },
+    { title: 'حركة اليوم', head: ['الوقت', 'النوع', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ'],
+      rows: dayTx.map((t) => [time(t.created_at), KIND[t.kind] || t.kind, custName(t.customer_id), nameOf(t.rep_id), t.invoice_no || '', Number(t.amount)]) },
+    { title: 'عملاء جدد', head: ['المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'الكود', 'الحالة'],
+      rows: newCust.map((c) => [c.name, c.owner_name || '', c.phone || '', c.location || '', nameOf(c.rep_id), c.code || '', c.status === 'pending' ? 'بانتظار التكويد' : 'متكوّد']) },
+  ]);
   return <>
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h2 className="text-2xl font-bold tracking-tight">النتيجة اليومية</h2>
         <p className="mt-1 text-sm text-muted-foreground">{agency !== 'all' && agencyName(agency) ? `توكيل ${agencyName(agency)} · ` : ''}{new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(day + 'T12:00:00'))}{!isToday && <> · <button className="font-medium text-brand hover:underline print:hidden" onClick={() => setDay(todayK)}>النهارده</button></>}</p></div>
-      <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 sm:w-auto print:hidden">
-        <Button variant="outline" size="icon" aria-label="اليوم اللي فات" onClick={() => shift(-1)}><ChevronRight /></Button>
-        <div className="min-w-0 overflow-hidden rounded-md"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" className="block w-full min-w-0 appearance-none sm:w-44" /></div>
-        <Button variant="outline" size="icon" aria-label="اليوم اللي بعده" disabled={isToday} onClick={() => shift(1)}><ChevronLeft /></Button>
-        <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto print:hidden">
+        <div className="grid min-w-0 flex-[1_1_220px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+          <Button variant="outline" size="icon" aria-label="اليوم اللي فات" onClick={() => shift(-1)}><ChevronRight /></Button>
+          <div className="min-w-0 overflow-hidden rounded-md"><Input type="date" value={day} max={todayK} onChange={(e) => setDay(e.target.value || todayK)} aria-label="اختار اليوم" className="block w-full min-w-0 appearance-none sm:w-44" /></div>
+          <Button variant="outline" size="icon" aria-label="اليوم اللي بعده" disabled={isToday} onClick={() => shift(1)}><ChevronLeft /></Button>
+        </div>
+        <div className="flex gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+          <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
+          <Button variant="outline" onClick={exportDay}><Download />تصدير Excel</Button>
+        </div>
       </div>
     </div>
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">

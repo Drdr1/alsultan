@@ -3,13 +3,14 @@ import {
   WarningCircle, Warning, Archive as PArchive, ArrowRight as PArrowRight, Bell as PBell, BellRinging, CalendarCheck, CalendarBlank,
   Check as PCheck, CheckCircle, CaretLeft, ClipboardText, Clock as PClock, Receipt, House, SquaresFour, LockSimple, SignOut,
   MapPin as PMapPin, PencilSimpleLine, Phone as PPhone, Broadcast, MagnifyingGlass, ShieldCheck as PShieldCheck, Storefront,
-  HandCoins, UserPlus as PUserPlus, UsersThree, Wallet as PWallet, X as PX, Lightning, Moon as PMoon, Sun as PSun, Export as PExport, GearSix, Camera as PCamera, CaretRight,
+  HandCoins, UserPlus as PUserPlus, UsersThree, Wallet as PWallet, X as PX, Lightning, Moon as PMoon, Sun as PSun, Export as PExport, GearSix, Camera as PCamera, CaretRight, DownloadSimple,
 } from '@phosphor-icons/react';
 
 const w = (C, weight = 'duotone') => (p) => <C weight={weight} {...p} />;
 
 export const AlertCircle = w(WarningCircle);
 export const Camera = w(PCamera);
+export const Download = w(DownloadSimple, 'bold');
 export const ChevronRight = w(CaretRight, 'bold');
 export const AlertTriangle = w(Warning);
 export const Archive = w(PArchive);

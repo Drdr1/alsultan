@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import { CalendarClock, Camera } from './icons.jsx';
-import { money, parseAmount, fmtDate, TERM_DAYS, DAY, openDay } from '../lib/core.js';
+import { normPhone, money, parseAmount, fmtDate, TERM_DAYS, DAY, openDay } from '../lib/core.js';
 import { useApp } from '../lib/store.jsx';
 import { Dialog, Button, Input, MoneyInput, Select, Textarea, Field, FormError, useSubmit, Segmented, cn } from './ui.jsx';
 
@@ -127,11 +127,13 @@ function AddCustomerDialog({ onClose }) {
   const direct = me.role === 'admin' && can('coding');
   const today = new Date().toISOString().slice(0, 10), minD = new Date(Date.now() - 365 * DAY).toISOString().slice(0, 10);
   const [name, setName] = useState(''); const [phone, setPhone] = useState(''); const [photo, setPhoto] = useState(null);
-  const dup = data.customers.find((c) => (name.trim() && c.name === name.trim()) || (phone.trim().length > 6 && c.phone === phone.trim()));
+  const dupPhone = normPhone(phone).length > 6 ? data.customers.find((c) => normPhone(c.phone) === normPhone(phone)) : null;
+  const dup = !dupPhone && name.trim() ? data.customers.find((c) => c.name === name.trim()) : null;
   const { busy, error, submit } = useSubmit(async (fd) => {
     const n = String(fd.get('name') || '').trim(); if (!n) throw new Error('اكتب اسم المحل');
     const owner = String(fd.get('owner_name') || '').trim(); if (!owner) throw new Error('اكتب اسم صاحب المحل');
     if (!String(fd.get('phone') || '').trim()) throw new Error('اكتب رقم التليفون');
+    if (dupPhone) throw new Error('رقم التليفون ده متسجل لعميل تاني');
     if (!String(fd.get('location') || '').trim()) throw new Error('اكتب العنوان');
     if (!photo) throw new Error('صوّر المحل');
     const opening = fd.get('opening') ? parseAmount(fd.get('opening')) : 0;
@@ -155,6 +157,7 @@ function AddCustomerDialog({ onClose }) {
         <Field label="الرصيد الحالي (عليه كام)"><MoneyInput name="opening" placeholder="0" className="text-end" /></Field>
         <Field label="تاريخ أقدم فاتورة مفتوحة"><Input name="opening_date" type="date" defaultValue={today} min={minD} max={today} /></Field>
       </div>
+      {dupPhone && <p className="rounded-md bg-danger-soft px-3 py-2 text-[0.875rem] font-medium text-danger">الرقم ده متسجل لـ "{dupPhone.name}"</p>}
       {dup && <p className="rounded-md bg-warning-soft px-3 py-2 text-[0.875rem] text-warning">تنبيه: فيه عميل مسجل باسم "{dup.name}"{dup.phone ? ` (${dup.phone})` : ''}</p>}
       <FormError>{error}</FormError>
       <div className="flex gap-2"><Button type="submit" className="flex-1" size="lg" disabled={busy}>{direct ? 'حفظ العميل' : 'إرسال طلب التكويد'}</Button><Button type="button" variant="outline" size="lg" onClick={onClose}>إلغاء</Button></div>
