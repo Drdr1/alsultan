@@ -3,6 +3,7 @@ import { Wallet, FileText, UserPlus, Store, AlertTriangle, Lock, TrendingDown, U
 import { money, fmtDate, fmtDT, monthKey, monthLabel, effect, signed, dueOf, dayKey, dayLabeler, missingFor, KIND, PERMS, TYPE, REP_TYPE, TERM_DAYS, DAY, parseAmount } from './lib/core.js';
 import { useApp } from './lib/store.jsx';
 import { downloadXLSX } from './lib/export.js';
+import { statementSheets } from './lib/statement.js';
 import { useDialogs, useToday } from './components/dialogs.jsx';
 import { ThemeToggle } from './components/layout.jsx';
 import { Segmented, MoneyInput, Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Avatar, Input, Field, FormError, useSubmit, Empty, Table, THead, TBody, TR, TH, TD, Select, cn } from './components/ui.jsx';
@@ -270,8 +271,9 @@ export function AccountsPage() {
 }
 
 export function RepDetail({ id }) {
-  const { data, summaryOf, api, toast, back, agencies, agency, agencyName, can } = useApp();
+  const { data, summaryOf, api, toast, back, agencies, agency, agencyName, can, stats } = useApp();
   const r = data.profiles.find((p) => p.id === id);
+  const kashf = () => downloadXLSX(`kashf-${r.username || r.id}-${dayKey()}`, statementSheets({ reps: [r], customers: data.customers, stats, agencyName }).slice(1));
   const [confirmStop, setConfirmStop] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => {
     const patch = { rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null };
@@ -281,6 +283,7 @@ export function RepDetail({ id }) {
   if (!r) return <Card><Empty title="المندوب غير موجود" /></Card>;
   const s = summaryOf(r);
   return <>
+    <div className="flex flex-wrap gap-2 print:hidden [&>*]:max-sm:flex-1"><Button variant="outline" onClick={kashf}><Download />كشف المديونية Excel</Button><Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button></div>
     <div className="grid grid-cols-2 gap-3 md:gap-4 min-[1400px]:grid-cols-4">
       <StatCard icon={TrendingDown} label="تحصيل الشهر" value={money(s.month)} sub={monthLabel(monthKey(Date.now()))} tone="success" />
       <StatCard icon={Store} label="العملاء" value={s.customers.length} />
@@ -618,13 +621,12 @@ export function ReportPage() {
       const cu = new Map(raw.customers.map((c) => [c.id, c]));
       const dt = (x) => (x ? new Date(x).toLocaleString('en-GB', { hour12: false }) : '');
       const st = { approved: 'معتمد', pending: 'معلق', rejected: 'مرفوض' };
-      await downloadXLSX(`alsultan-backup-${todayK}`, [
-        { name: 'العملاء', head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'التوكيل', 'النوع', 'الحالة', 'الرصيد', 'متأخر (يوم)', 'تاريخ التسجيل'],
+      await downloadXLSX(`kashf-${todayK}`, [
+        ...statementSheets({ reps: raw.profiles.filter((p) => p.role === 'rep'), customers: raw.customers, stats, agencyName: ag }),
+        { name: 'كل العملاء', head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'التوكيل', 'النوع', 'الحالة', 'الرصيد', 'متأخر (يوم)', 'تاريخ التسجيل'],
           rows: raw.customers.map((c) => { const x = stats.get(c.id) || {}; return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', pn(c.rep_id), ag(c.agency_id), TYPE[c.debt_type] || '', st[c.status || 'approved'] || c.status, x.balance ?? '', x.overdue ? x.overdueDays : '', dt(c.created_at)]; }) },
         { name: 'كل الحركات', head: ['التاريخ', 'النوع', 'كود العميل', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ', 'أثره على الرصيد', 'الحالة', 'ملاحظة', 'سجّلها', 'وقت التسجيل', 'راجعها'],
           rows: [...raw.transactions].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at)).map((t) => { const c = cu.get(t.customer_id) || {}; return [dt(t.occurred_at), KIND[t.kind] || t.kind, c.code || '', c.name || '', pn(t.rep_id), t.invoice_no || '', Number(t.amount), t.status === 'approved' ? effect(t) : 0, st[t.status] || t.status, t.note || '', pn(t.created_by), dt(t.created_at), pn(t.reviewed_by)]; }) },
-        { name: 'المناديب', head: ['المندوب', 'اسم الدخول', 'التوكيل', 'النوع', 'حد الائتمان', 'المديونية', 'مفعّل'],
-          rows: raw.profiles.filter((p) => p.role === 'rep').map((r) => [r.full_name, r.username || '', ag(r.agency_id), REP_TYPE[r.rep_type] || '', Number(r.credit_limit) || 0, raw.customers.filter((c) => c.rep_id === r.id).reduce((a, c) => a + (stats.get(c.id)?.balance || 0), 0), r.active ? 'أيوه' : 'لأ']) },
         { name: 'التقفيلات', head: ['المندوب', 'اليوم', 'وقت التقفيل', 'تحصيل', 'فواتير', 'مرتجعات', 'توريد'],
           rows: [...(raw.closings || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((x) => [pn(x.rep_id), x.day, dt(x.created_at), Number(x.collections), Number(x.invoices), Number(x.returns), Number(x.remitted)]) },
       ]);
@@ -642,7 +644,7 @@ export function ReportPage() {
         <div className="flex flex-wrap gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
           <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
           <Button variant="outline" onClick={exportDay}><Download />تصدير Excel</Button>
-          {(owner || can('credit')) && <Button variant="outline" disabled={backing} onClick={backup}><Archive />نسخة كاملة</Button>}
+          {(owner || can('credit')) && <Button variant="outline" disabled={backing} onClick={backup}><Archive />كشف المديونية</Button>}
         </div>
       </div>
     </div>
