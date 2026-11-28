@@ -273,7 +273,7 @@ export function AccountsPage() {
 export function RepDetail({ id }) {
   const { data, summaryOf, api, toast, back, agencies, agency, agencyName, can, stats } = useApp();
   const r = data.profiles.find((p) => p.id === id);
-  const kashf = () => downloadXLSX(`kashf-${r.username || r.id}-${dayKey()}`, statementSheets({ reps: [r], customers: data.customers, stats, agencyName }).slice(1));
+  const kashf = () => downloadXLSX(`kashf-${r.username || r.id}-${dayKey()}`, statementSheets({ reps: [r], customers: data.customers, stats, agencyName, dayTx: data.transactions.filter((t) => t.rep_id === r.id && t.status === 'approved' && dayLabeler(data.closings, data.transactions, r.id)(t) === dayKey()), day: dayKey() }).slice(1));
   const [confirmStop, setConfirmStop] = useState(false);
   const { busy, error, submit } = useSubmit(async (fd) => {
     const patch = { rep_type: fd.get('rep_type'), agency_id: fd.get('agency_id') || null };
@@ -614,7 +614,7 @@ export function ReportPage() {
       const dt = (x) => (x ? new Date(x).toLocaleString('en-GB', { hour12: false }) : '');
       const st = { approved: 'معتمد', pending: 'معلق', rejected: 'مرفوض' };
       await downloadXLSX(`kashf-${agency}-${todayK}`, [
-        ...statementSheets({ reps: src.profiles.filter((p) => p.role === 'rep'), customers: src.customers, stats, agencyName: ag }),
+        ...statementSheets({ reps: src.profiles.filter((p) => p.role === 'rep'), customers: src.customers, stats, agencyName: ag, dayTx, day }),
         { name: 'كل العملاء', head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'التوكيل', 'النوع', 'الحالة', 'الرصيد', 'متأخر (يوم)', 'تاريخ التسجيل'],
           rows: src.customers.map((c) => { const x = stats.get(c.id) || {}; return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', pn(c.rep_id), ag(c.agency_id), TYPE[c.debt_type] || '', st[c.status || 'approved'] || c.status, x.balance ?? '', x.overdue ? x.overdueDays : '', dt(c.created_at)]; }) },
         { name: 'كل الحركات', head: ['التاريخ', 'النوع', 'كود العميل', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ', 'أثره على الرصيد', 'الحالة', 'ملاحظة', 'سجّلها', 'وقت التسجيل', 'راجعها'],
