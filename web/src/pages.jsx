@@ -603,15 +603,6 @@ export function ReportPage() {
   const custName = (id) => data.customers.find((c) => c.id === id)?.name || '—';
   const time = (x) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { hour: 'numeric', minute: '2-digit' }).format(new Date(x));
   const list = tab === 'customers' ? null : dayTx.filter((t) => t.kind === tab);
-  const exportDay = () => downloadXLSX(`alsultan-day-${day}`, [
-    { name: 'المناديب', title: `النتيجة اليومية ${day}${agency !== 'all' && agencyName(agency) ? ' - ' + agencyName(agency) : ''}`, head: ['المندوب', 'النوع', 'المديونية', 'الحد', 'فواتير', 'تحصيل', 'مرتجع', 'توريد', 'الحالة', 'التقفيل'],
-      rows: [...rows.map((x) => [x.r.full_name, REP_TYPE[x.r.rep_type] || '', x.total, x.limit, x.inv, x.col, x.ret, x.closing ? Number(x.closing.remitted) : '', x.over ? 'موقوف عن البضاعة' : x.pct >= 0.9 ? 'قرب من الحد' : 'متاح', x.closing ? 'قفل' : 'مقفلش']),
-        ['الإجمالي', '', total, tot('limit'), tot('inv'), col, tot('ret'), remitted, '', `${closedN} من ${rows.length}`]] },
-    { name: 'حركة اليوم', head: ['الوقت', 'النوع', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ'],
-      rows: dayTx.map((t) => [time(t.created_at), KIND[t.kind] || t.kind, custName(t.customer_id), nameOf(t.rep_id), t.invoice_no || '', Number(t.amount)]) },
-    { name: 'عملاء جدد', head: ['المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'الكود', 'الحالة'],
-      rows: newCust.map((c) => [c.name, c.owner_name || '', c.phone || '', c.location || '', nameOf(c.rep_id), c.code || '', c.status === 'pending' ? 'بانتظار التكويد' : 'متكوّد']) },
-  ]);
   const [backing, setBacking] = useState(false);
   const backup = async () => {
     setBacking(true);
@@ -643,7 +634,6 @@ export function ReportPage() {
         </div>
         <div className="flex flex-wrap gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
           <Button variant="outline" onClick={() => window.print()}><FileText />طباعة</Button>
-          <Button variant="outline" onClick={exportDay}><Download />تصدير Excel</Button>
           {(owner || can('credit')) && <Button variant="outline" disabled={backing} onClick={backup}><Archive />كشف المديونية</Button>}
         </div>
       </div>
