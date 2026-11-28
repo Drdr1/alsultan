@@ -607,19 +607,20 @@ export function ReportPage() {
   const backup = async () => {
     setBacking(true);
     try {
-      const pn = (id) => raw.profiles.find((p) => p.id === id)?.full_name || '';
-      const ag = (id) => raw.agencies.find((a) => a.id === id)?.name || '';
-      const cu = new Map(raw.customers.map((c) => [c.id, c]));
+      const src = data; // only the agency on screen (agencies are kept separate)
+      const pn = (id) => src.profiles.find((p) => p.id === id)?.full_name || '';
+      const ag = (id) => agencyName(id) || '';
+      const cu = new Map(src.customers.map((c) => [c.id, c]));
       const dt = (x) => (x ? new Date(x).toLocaleString('en-GB', { hour12: false }) : '');
       const st = { approved: 'معتمد', pending: 'معلق', rejected: 'مرفوض' };
-      await downloadXLSX(`kashf-${todayK}`, [
-        ...statementSheets({ reps: raw.profiles.filter((p) => p.role === 'rep'), customers: raw.customers, stats, agencyName: ag }),
+      await downloadXLSX(`kashf-${agency}-${todayK}`, [
+        ...statementSheets({ reps: src.profiles.filter((p) => p.role === 'rep'), customers: src.customers, stats, agencyName: ag }),
         { name: 'كل العملاء', head: ['الكود', 'المحل', 'صاحب المحل', 'التليفون', 'العنوان', 'المندوب', 'التوكيل', 'النوع', 'الحالة', 'الرصيد', 'متأخر (يوم)', 'تاريخ التسجيل'],
-          rows: raw.customers.map((c) => { const x = stats.get(c.id) || {}; return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', pn(c.rep_id), ag(c.agency_id), TYPE[c.debt_type] || '', st[c.status || 'approved'] || c.status, x.balance ?? '', x.overdue ? x.overdueDays : '', dt(c.created_at)]; }) },
+          rows: src.customers.map((c) => { const x = stats.get(c.id) || {}; return [c.code || '', c.name, c.owner_name || '', c.phone || '', c.location || '', pn(c.rep_id), ag(c.agency_id), TYPE[c.debt_type] || '', st[c.status || 'approved'] || c.status, x.balance ?? '', x.overdue ? x.overdueDays : '', dt(c.created_at)]; }) },
         { name: 'كل الحركات', head: ['التاريخ', 'النوع', 'كود العميل', 'العميل', 'المندوب', 'رقم الفاتورة', 'المبلغ', 'أثره على الرصيد', 'الحالة', 'ملاحظة', 'سجّلها', 'وقت التسجيل', 'راجعها'],
-          rows: [...raw.transactions].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at)).map((t) => { const c = cu.get(t.customer_id) || {}; return [dt(t.occurred_at), KIND[t.kind] || t.kind, c.code || '', c.name || '', pn(t.rep_id), t.invoice_no || '', Number(t.amount), t.status === 'approved' ? effect(t) : 0, st[t.status] || t.status, t.note || '', pn(t.created_by), dt(t.created_at), pn(t.reviewed_by)]; }) },
+          rows: [...src.transactions].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at)).map((t) => { const c = cu.get(t.customer_id) || {}; return [dt(t.occurred_at), KIND[t.kind] || t.kind, c.code || '', c.name || '', pn(t.rep_id), t.invoice_no || '', Number(t.amount), t.status === 'approved' ? effect(t) : 0, st[t.status] || t.status, t.note || '', pn(t.created_by), dt(t.created_at), pn(t.reviewed_by)]; }) },
         { name: 'التقفيلات', head: ['المندوب', 'اليوم', 'وقت التقفيل', 'تحصيل', 'فواتير', 'مرتجعات', 'توريد'],
-          rows: [...(raw.closings || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((x) => [pn(x.rep_id), x.day, dt(x.created_at), Number(x.collections), Number(x.invoices), Number(x.returns), Number(x.remitted)]) },
+          rows: [...(src.closings || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((x) => [pn(x.rep_id), x.day, dt(x.created_at), Number(x.collections), Number(x.invoices), Number(x.returns), Number(x.remitted)]) },
       ]);
     } finally { setBacking(false); }
   };  return <>
